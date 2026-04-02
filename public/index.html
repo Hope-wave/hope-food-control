@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base Hope - Controle de Alimentos</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <h1>Base Hope - Controle de Estoque</h1>
+        <p>Igreja Onda Dura</p>
+      </header>
+
+      <section id="login-section" class="card">
+        <h2>Entrar</h2>
+        <form id="login-form">
+          <label for="username">Usuario</label>
+          <input id="username" name="username" type="text" required />
+
+          <label for="password">Senha</label>
+          <input id="password" name="password" type="password" required />
+
+          <button type="submit">Login</button>
+        </form>
+        <p class="hint">
+          Perfis: voluntario e administrador (configurados no backend)
+        </p>
+      </section>
+
+      <section id="app-section" class="hidden">
+        <div class="card top-bar">
+          <div>
+            <h2>Painel</h2>
+            <p id="welcome-text"></p>
+          </div>
+          <button id="logout-btn" class="secondary">Sair</button>
+        </div>
+
+        <section id="volunteer-panel" class="hidden">
+          <div class="grid">
+            <article class="card">
+              <h3>Cadastro de Alimento</h3>
+              <form id="food-form">
+                <label for="food-name">Nome</label>
+                <input id="food-name" name="name" type="text" required />
+
+                <label for="food-quantity">Quantidade</label>
+                <input
+                  id="food-quantity"
+                  name="quantity"
+                  type="number"
+                  min="1"
+                  required
+                />
+
+                <label for="food-weight">Peso (kg)</label>
+                <input
+                  id="food-weight"
+                  name="weight"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  required
+                />
+
+                <label for="food-validity">Data de validade</label>
+                <input
+                  id="food-validity"
+                  name="validityDate"
+                  type="date"
+                  required
+                />
+
+                <button type="submit">Salvar alimento</button>
+              </form>
+              <div id="food-result" class="result hidden"></div>
+            </article>
+
+            <article class="card">
+              <h3>Registrar Saida</h3>
+              <form id="output-form">
+                <label for="output-id">ID do alimento</label>
+                <input
+                  id="output-id"
+                  name="id"
+                  type="text"
+                  placeholder="ABC123"
+                  required
+                />
+
+                <label for="output-quantity">Quantidade de saida</label>
+                <input
+                  id="output-quantity"
+                  name="quantityOut"
+                  type="number"
+                  min="1"
+                  required
+                />
+
+                <button type="submit">Registrar saida</button>
+              </form>
+              <div id="output-result" class="result hidden"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="admin-panel" class="hidden">
+          <div class="card">
+            <h3>Alertas (vencimento em ate 30 dias)</h3>
+            <ul id="alerts-list" class="alerts-list"></ul>
+          </div>
+
+          <div class="card">
+            <div class="table-header">
+              <h3>Estoque completo</h3>
+              <button id="refresh-admin-btn" class="secondary">Atualizar</button>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Quantidade</th>
+                    <th>Peso (kg)</th>
+                    <th>Validade</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="foods-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="./script.js"></script>
+  </body>
+</html>

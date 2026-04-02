@@ -1,0 +1,24 @@
+{
+  "name": "hope-food-control",
+  "version": "1.0.0",
+  "description": "MVP de controle de estoque de alimentos da Base Hope",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "NODE_ENV=production node server.js"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "firebase",
+    "inventory"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "firebase-admin": "^12.1.1"
+  }
+}
