@@ -37,7 +37,7 @@ app.post("/api/login", (req, res) => {
   const user = authenticate(username, password);
 
   if (!user) {
-    return res.status(401).json({ message: "Usuario ou senha invalidos." });
+    return res.status(401).json({ message: "Usuário ou senha inválidos." });
   }
 
   req.session.user = user;
@@ -105,14 +105,14 @@ app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
     if (!id || !quantityOut) {
       return res
         .status(400)
-        .json({ message: "Informe ID e quantidade de saida." });
+        .json({ message: "Informe ID e quantidade de saída." });
     }
 
     const foodRef = db.collection("foods").doc(String(id).trim().toUpperCase());
     const snapshot = await foodRef.get();
 
     if (!snapshot.exists) {
-      return res.status(404).json({ message: "Alimento nao encontrado." });
+      return res.status(404).json({ message: "Alimento não encontrado." });
     }
 
     const food = snapshot.data();
@@ -121,12 +121,12 @@ app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
     if (outputQty <= 0) {
       return res
         .status(400)
-        .json({ message: "Quantidade de saida deve ser maior que zero." });
+        .json({ message: "Quantidade de saída deve ser maior que zero." });
     }
 
     if (outputQty > food.quantity) {
       return res.status(400).json({
-        message: "Quantidade de saida maior que o estoque atual."
+        message: "Quantidade de saída maior que o estoque atual."
       });
     }
 
@@ -146,7 +146,7 @@ app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
     });
 
     return res.json({
-      message: "Saida registrada com sucesso.",
+      message: "Saída registrada com sucesso.",
       foodId: food.id,
       quantityRemaining: updatedQty
     });

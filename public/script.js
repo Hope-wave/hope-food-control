@@ -14,6 +14,7 @@ const foodResult = document.getElementById("food-result");
 const outputResult = document.getElementById("output-result");
 const foodsTbody = document.getElementById("foods-tbody");
 const alertsList = document.getElementById("alerts-list");
+const loginResult = document.getElementById("login-result");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -25,7 +26,7 @@ async function api(path, options = {}) {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.message || "Erro ao processar requisicao.");
+    throw new Error(data.message || "Erro ao processar requisição.");
   }
   return data;
 }
@@ -39,7 +40,8 @@ function showMessage(container, text, isError = false) {
 function showApp(user) {
   loginSection.classList.add("hidden");
   appSection.classList.remove("hidden");
-  welcomeText.textContent = `Usuario: ${user.username} | Perfil: ${user.role}`;
+  const roleLabel = user.role === "admin" ? "Administrador" : "Voluntário";
+  welcomeText.textContent = `Usuário: ${user.username} | Perfil: ${roleLabel}`;
 
   volunteerPanel.classList.toggle("hidden", user.role !== "volunteer");
   adminPanel.classList.toggle("hidden", user.role !== "admin");
@@ -50,10 +52,11 @@ function showLogin() {
   loginSection.classList.remove("hidden");
   volunteerPanel.classList.add("hidden");
   adminPanel.classList.add("hidden");
+  loginResult.classList.add("hidden");
 }
 
 function statusLabel(status) {
-  if (status === "proximo") return "Proximo do vencimento";
+  if (status === "proximo") return "Próximo do vencimento";
   if (status === "vencido") return "Vencido";
   return "Normal";
 }
@@ -119,12 +122,13 @@ loginForm.addEventListener("submit", async (event) => {
       }
     });
     loginForm.reset();
+    loginResult.classList.add("hidden");
     showApp(data.user);
     if (data.user.role === "admin") {
       await loadAdminData();
     }
   } catch (error) {
-    alert(error.message);
+    showMessage(loginResult, error.message, true);
   }
 });
 
@@ -164,7 +168,7 @@ outputForm.addEventListener("submit", async (event) => {
     outputForm.reset();
     showMessage(
       outputResult,
-      `Saida registrada. ID: ${output.foodId} | Estoque restante: ${output.quantityRemaining}`
+      `Saída registrada. ID: ${output.foodId} | Estoque restante: ${output.quantityRemaining}`
     );
   } catch (error) {
     showMessage(outputResult, error.message, true);

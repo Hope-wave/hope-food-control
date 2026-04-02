@@ -7,26 +7,46 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div class="bg-glow bg-glow-left"></div>
+    <div class="bg-glow bg-glow-right"></div>
     <main class="container">
       <header class="hero">
-        <h1>Base Hope - Controle de Estoque</h1>
-        <p>Igreja Onda Dura</p>
+        <span class="tag">BASE HOPE</span>
+        <h1>Controle de estoque de alimentos</h1>
+        <p>Sistema simples para operação diária da Igreja Onda Dura</p>
       </header>
 
       <section id="login-section" class="card">
-        <h2>Entrar</h2>
-        <form id="login-form">
-          <label for="username">Usuario</label>
-          <input id="username" name="username" type="text" required />
+        <div class="login-layout">
+          <div class="login-brand">
+            <h2>Bem-vindo(a)!</h2>
+            <p class="section-description">
+              Faça login para registrar entradas, saídas e acompanhar o estoque.
+            </p>
+            <ul class="login-features">
+              <li>Cadastro rápido de alimentos</li>
+              <li>Geração automática de ID para etiquetas</li>
+              <li>Visão completa e alertas para administração</li>
+            </ul>
+          </div>
 
-          <label for="password">Senha</label>
-          <input id="password" name="password" type="password" required />
+          <div class="login-form-card">
+            <h3>Entrar no sistema</h3>
+            <p class="section-description">
+              Use seu usuário para acessar as funções de voluntário ou administrador.
+            </p>
+            <form id="login-form">
+              <label for="username">Usuário</label>
+              <input id="username" name="username" type="text" required />
 
-          <button type="submit">Login</button>
-        </form>
-        <p class="hint">
-          Perfis: voluntario e administrador (configurados no backend)
-        </p>
+              <label for="password">Senha</label>
+              <input id="password" name="password" type="password" required />
+
+              <button type="submit">Entrar</button>
+            </form>
+            <div id="login-result" class="result hidden"></div>
+          </div>
+        </div>
       </section>
 
       <section id="app-section" class="hidden">
@@ -42,6 +62,9 @@
           <div class="grid">
             <article class="card">
               <h3>Cadastro de Alimento</h3>
+              <p class="section-description">
+                Registre entradas no estoque e gere o ID de etiquetagem.
+              </p>
               <form id="food-form">
                 <label for="food-name">Nome</label>
                 <input id="food-name" name="name" type="text" required />
@@ -79,7 +102,10 @@
             </article>
 
             <article class="card">
-              <h3>Registrar Saida</h3>
+              <h3>Registrar Saída</h3>
+              <p class="section-description">
+                Informe o ID da etiqueta e a quantidade retirada.
+              </p>
               <form id="output-form">
                 <label for="output-id">ID do alimento</label>
                 <input
@@ -90,7 +116,7 @@
                   required
                 />
 
-                <label for="output-quantity">Quantidade de saida</label>
+                <label for="output-quantity">Quantidade de saída</label>
                 <input
                   id="output-quantity"
                   name="quantityOut"
@@ -99,7 +125,7 @@
                   required
                 />
 
-                <button type="submit">Registrar saida</button>
+                <button type="submit">Registrar saída</button>
               </form>
               <div id="output-result" class="result hidden"></div>
             </article>
@@ -108,7 +134,7 @@
 
         <section id="admin-panel" class="hidden">
           <div class="card">
-            <h3>Alertas (vencimento em ate 30 dias)</h3>
+            <h3>Alertas (vencimento em até 30 dias)</h3>
             <ul id="alerts-list" class="alerts-list"></ul>
           </div>
 
