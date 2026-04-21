@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="hope-api-origin" content="__HOPE_API_ORIGIN__" />
     <title>Base Hope - Controle de Alimentos</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="bg-glow bg-glow-left"></div>
@@ -58,6 +59,50 @@
           <button id="logout-btn" class="secondary">Sair</button>
         </div>
 
+        <section id="basket-panel" class="card basket-section hidden">
+          <h3>Cesta básica</h3>
+          <p class="section-description">
+            Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
+            estoque. A ordem é por validade mais próxima (FEFO). Os 7 itens da base são
+            obrigatórios; adicionais entram quando houver estoque — se faltar adicional, a
+            cesta ainda pode sair.
+          </p>
+          <div class="basket-toolbar">
+            <button type="button" id="basket-plan-btn">Calcular montagem</button>
+            <button type="button" id="basket-checkout-btn" class="secondary" disabled>
+              Registrar saída desta cesta
+            </button>
+          </div>
+          <label for="basket-notes">Observações (opcional)</label>
+          <textarea
+            id="basket-notes"
+            name="basketNotes"
+            rows="2"
+            maxlength="500"
+            placeholder="Ex.: família X, entrega no bairro Y"
+          ></textarea>
+          <div id="basket-result" class="result hidden"></div>
+          <p id="basket-hint" class="hint hidden"></p>
+          <div class="table-wrapper hidden" id="basket-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ordem</th>
+                  <th>Tipo</th>
+                  <th>Categoria</th>
+                  <th>ID (etiqueta)</th>
+                  <th>Nome no cadastro</th>
+                  <th>Validade</th>
+                  <th>Dias</th>
+                  <th>Baixa (un.)</th>
+                </tr>
+              </thead>
+              <tbody id="basket-plan-tbody"></tbody>
+            </table>
+          </div>
+          <ul id="basket-skipped-list" class="basket-skipped hidden"></ul>
+        </section>
+
         <section id="volunteer-panel" class="hidden">
           <div class="grid">
             <article class="card">
@@ -78,14 +123,13 @@
                   required
                 />
 
-                <label for="food-weight">Peso (kg)</label>
+                <label for="food-weight">Peso (kg) — opcional</label>
                 <input
                   id="food-weight"
                   name="weight"
                   type="number"
-                  min="0.1"
                   step="0.1"
-                  required
+                  placeholder="Deixe em branco se não souber"
                 />
 
                 <label for="food-validity">Data de validade</label>
@@ -112,7 +156,7 @@
                   id="output-id"
                   name="id"
                   type="text"
-                  placeholder="ABC123"
+                  placeholder="A1"
                   required
                 />
 
@@ -162,6 +206,6 @@
         </section>
       </section>
     </main>
-    <script src="./script.js"></script>
+    <script src="/script.js"></script>
   </body>
 </html>

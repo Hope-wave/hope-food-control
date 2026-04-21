@@ -195,6 +195,28 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(112, 64, 232, 0.14);
 }
 
+textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  margin-top: 6px;
+  background: var(--gray-100);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 72px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #8f68ee;
+  box-shadow: 0 0 0 3px rgba(112, 64, 232, 0.14);
+}
+
 button {
   margin-top: 14px;
   background: linear-gradient(120deg, #6334da, #8f55ea);
@@ -320,6 +342,71 @@ td {
 }
 
 .alerts-list li:first-child {
+  margin-top: 0;
+}
+
+.basket-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.basket-toolbar button {
+  margin-top: 0;
+}
+
+.basket-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.basket-pill.base {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.basket-pill.extra {
+  color: #1f5f3a;
+  background: #e8f6ee;
+}
+
+.basket-food-id {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.basket-skipped {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.basket-skipped li {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  color: var(--gray-500);
+  font-size: 13px;
+}
+
+.basket-skipped li:first-child {
   margin-top: 0;
 }
 

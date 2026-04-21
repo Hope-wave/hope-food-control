@@ -19,7 +19,7 @@ Aplicacao web simples para controle de estoque de alimentos da Base Hope (Igreja
   - quantidade
   - peso (kg)
   - data de validade
-- Geracao automatica de ID curto unico (ex: `ABC123`) para etiquetagem fisica
+- Geracao automatica de ID curto unico no formato letra+numero (ex: `A1`) para etiquetagem fisica
 - Registro de saida de alimento por ID
 
 ### Administrador
@@ -79,6 +79,21 @@ cp .env.example .env
 - usuarios e senhas (admin e voluntario)
 - credenciais do Firebase (`FIREBASE_SERVICE_ACCOUNT_PATH` ou `FIREBASE_SERVICE_ACCOUNT_JSON`)
 - `FIREBASE_PROJECT_ID` (se necessario)
+
+### Configuracao rapida do Firebase (recomendado)
+
+1. No Console Firebase, acesse `Project settings > Service accounts`.
+2. Clique em `Generate new private key` e salve o arquivo JSON na raiz do projeto com nome `firebase-service-account.json`.
+3. No `.env`, mantenha:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+FIREBASE_PROJECT_ID=seu-project-id
+```
+
+4. Inicie o projeto e valide no terminal:
+   - Se conectou no Firestore: `Firebase conectado com sucesso ao Firestore.`
+   - Se nao conectou: `Firebase nao configurado. Rodando em modo local (dados em memoria).`
 
 4. Execute:
 

@@ -49,4 +49,18 @@ function requireRole(role) {
   };
 }
 
-module.exports = { authenticate, requireAuth, requireRole };
+function requireRoles(...roles) {
+  return (req, res, next) => {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Nao autenticado." });
+    }
+
+    if (!roles.includes(req.session.user.role)) {
+      return res.status(403).json({ message: "Acesso negado." });
+    }
+
+    return next();
+  };
+}
+
+module.exports = { authenticate, requireAuth, requireRole, requireRoles };

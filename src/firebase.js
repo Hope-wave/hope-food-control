@@ -1,10 +1,28 @@
 const path = require("path");
 const admin = require("firebase-admin");
 
+function normalizeServiceAccount(serviceAccount) {
+  if (!serviceAccount || typeof serviceAccount !== "object") {
+    throw new Error("Credencial de servico Firebase invalida.");
+  }
+
+  const requiredFields = ["project_id", "client_email", "private_key"];
+  const missing = requiredFields.filter((field) => !serviceAccount[field]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Credencial incompleta. Campos ausentes: ${missing.join(", ")}.`
+    );
+  }
+
+  return {
+    ...serviceAccount,
+    private_key: String(serviceAccount.private_key).replace(/\\n/g, "\n")
+  };
+}
+
 function createInMemoryDb() {
   const store = {
-    foods: new Map(),
-    outputs: new Map()
+    foods: new Map()
   };
 
   return {
@@ -57,14 +75,16 @@ function createInMemoryDb() {
 }
 
 function buildServiceAccount() {
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
 
   if (json) {
     try {
-      return JSON.parse(json);
+      return normalizeServiceAccount(JSON.parse(json));
     } catch (error) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON invalido.");
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_JSON invalido: ${error.message}`
+      );
     }
   }
 
@@ -75,12 +95,10 @@ function buildServiceAccount() {
 
     // Dynamic require keeps setup simple for local MVP usage.
     // eslint-disable-next-line global-require
-    return require(absolutePath);
+    return normalizeServiceAccount(require(absolutePath));
   }
 
-  throw new Error(
-    "Configure FIREBASE_SERVICE_ACCOUNT_PATH ou FIREBASE_SERVICE_ACCOUNT_JSON no .env."
-  );
+  return null;
 }
 
 function initFirebase() {
@@ -88,10 +106,16 @@ function initFirebase() {
     return admin.firestore();
   }
 
-  let serviceAccount;
+  let serviceAccount = null;
   try {
     serviceAccount = buildServiceAccount();
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(`Falha ao inicializar Firebase: ${error.message}`);
+    return createInMemoryDb();
+  }
+
+  if (!serviceAccount) {
     // eslint-disable-next-line no-console
     console.warn(
       "Firebase nao configurado. Rodando em modo local (dados em memoria)."
@@ -104,6 +128,8 @@ function initFirebase() {
     projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id
   });
 
+  // eslint-disable-next-line no-console
+  console.log("Firebase conectado com sucesso ao Firestore.");
   return admin.firestore();
 }
 
