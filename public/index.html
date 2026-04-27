@@ -14,7 +14,7 @@
       <header class="hero">
         <span class="tag">BASE HOPE</span>
         <h1>Controle de estoque de alimentos</h1>
-        <p>Sistema simples para operação diária da Igreja Onda Dura</p>
+        <p>Sistema para controle de estoque de alimentos do Hope</p>
       </header>
 
       <section id="login-section" class="card">
@@ -22,19 +22,17 @@
           <div class="login-brand">
             <h2>Bem-vindo(a)!</h2>
             <p class="section-description">
-              Faça login para registrar entradas, saídas e acompanhar o estoque.
+              Faça login para registrar entradas e saídas de alimentos e cestas básicas.
             </p>
-            <ul class="login-features">
-              <li>Cadastro rápido de alimentos</li>
-              <li>Geração automática de ID para etiquetas</li>
-              <li>Visão completa e alertas para administração</li>
-            </ul>
           </div>
 
           <div class="login-form-card">
             <h3>Entrar no sistema</h3>
             <p class="section-description">
-              Use seu usuário para acessar as funções de voluntário ou administrador.
+              Use seu login para acessar as funções disponíveis.
+            </p>
+            <p class="section-description">
+              Não compartilhe seu acesso com outras pessoas.
             </p>
             <form id="login-form">
               <label for="username">Usuário</label>
@@ -63,7 +61,7 @@
           <h3>Cesta básica</h3>
           <p class="section-description">
             Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
-            estoque. A ordem é por validade mais próxima (FEFO). Os 7 itens da base são
+            estoque. A ordem é por validade mais próxima. Os 7 itens da base são
             obrigatórios; adicionais entram quando houver estoque — se faltar adicional, a
             cesta ainda pode sair.
           </p>
@@ -114,15 +112,6 @@
                 <label for="food-name">Nome</label>
                 <input id="food-name" name="name" type="text" required />
 
-                <label for="food-quantity">Quantidade</label>
-                <input
-                  id="food-quantity"
-                  name="quantity"
-                  type="number"
-                  min="1"
-                  required
-                />
-
                 <label for="food-weight">Peso (kg) — opcional</label>
                 <input
                   id="food-weight"
@@ -148,7 +137,7 @@
             <article class="card">
               <h3>Registrar Saída</h3>
               <p class="section-description">
-                Informe o ID da etiqueta e a quantidade retirada.
+                Informe o ID da etiqueta para retirar 1 unidade.
               </p>
               <form id="output-form">
                 <label for="output-id">ID do alimento</label>
@@ -157,15 +146,6 @@
                   name="id"
                   type="text"
                   placeholder="A1"
-                  required
-                />
-
-                <label for="output-quantity">Quantidade de saída</label>
-                <input
-                  id="output-quantity"
-                  name="quantityOut"
-                  type="number"
-                  min="1"
                   required
                 />
 
@@ -180,12 +160,22 @@
           <div class="card">
             <h3>Alertas (vencimento em até 30 dias)</h3>
             <ul id="alerts-list" class="alerts-list"></ul>
+            <div id="alerts-pagination" class="pagination hidden">
+              <button id="alerts-prev-btn" type="button" class="secondary">Anterior</button>
+              <span id="alerts-page-info" class="pagination-info"></span>
+              <button id="alerts-next-btn" type="button" class="secondary">Próxima</button>
+            </div>
           </div>
 
           <div class="card">
             <div class="table-header">
               <h3>Estoque completo</h3>
-              <button id="refresh-admin-btn" class="secondary">Atualizar</button>
+              <div class="table-actions">
+                <button id="export-pdf-btn" class="secondary" type="button">
+                  Exportar PDF
+                </button>
+                <button id="refresh-admin-btn" class="secondary">Atualizar</button>
+              </div>
             </div>
             <div class="table-wrapper">
               <table>
@@ -202,10 +192,17 @@
                 <tbody id="foods-tbody"></tbody>
               </table>
             </div>
+            <div id="foods-pagination" class="pagination hidden">
+              <button id="foods-prev-btn" type="button" class="secondary">Anterior</button>
+              <span id="foods-page-info" class="pagination-info"></span>
+              <button id="foods-next-btn" type="button" class="secondary">Próxima</button>
+            </div>
           </div>
         </section>
       </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="/script.js"></script>
   </body>
 </html>

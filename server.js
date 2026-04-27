@@ -96,7 +96,7 @@ app.get("/api/me", (req, res) => {
 
 app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
   try {
-    const { name, quantity, weight, validityDate } = req.body;
+    const { name, weight, validityDate } = req.body;
 
     const nameTrimmed = String(name || "").trim();
     if (!nameTrimmed) {
@@ -109,19 +109,6 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
         : String(validityDate).trim();
     if (!validityTrimmed) {
       return res.status(400).json({ message: "Informe a data de validade." });
-    }
-
-    const parsedQuantity = Number(quantity);
-    if (
-      quantity === undefined ||
-      quantity === null ||
-      quantity === "" ||
-      Number.isNaN(parsedQuantity) ||
-      parsedQuantity <= 0
-    ) {
-      return res.status(400).json({
-        message: "Informe a quantidade (número inteiro maior que zero)."
-      });
     }
 
     let parsedWeight = null;
@@ -138,21 +125,40 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
       }
     }
 
-    const shortId = await createUniqueFoodId(db);
-    const payload = {
-      id: shortId,
-      name: nameTrimmed,
-      quantity: parsedQuantity,
-      weight: parsedWeight,
-      validityDate: validityTrimmed,
-      available: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: req.session.user.username
-    };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const shortId = await createUniqueFoodId(db);
+      const payload = {
+        id: shortId,
+        name: nameTrimmed,
+        quantity: 1,
+        weight: parsedWeight,
+        validityDate: validityTrimmed,
+        available: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: req.session.user.username
+      };
 
-    await db.collection("foods").doc(shortId).set(payload);
-    return res.status(201).json(payload);
+      try {
+        // "create" falha se o doc ja existir: evita sobrescrever em corrida simultanea.
+        // eslint-disable-next-line no-await-in-loop
+        await db.collection("foods").doc(shortId).create(payload);
+        return res.status(201).json(payload);
+      } catch (error) {
+        const alreadyExists =
+          error?.code === 6 ||
+          error?.code === "already-exists" ||
+          String(error?.message || "").toLowerCase().includes("already exists");
+        if (!alreadyExists) {
+          throw error;
+        }
+      }
+    }
+
+    return res.status(503).json({
+      message: "Nao foi possivel gerar um ID unico no momento. Tente novamente."
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -160,12 +166,10 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
 
 app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
   try {
-    const { id, quantityOut } = req.body;
+    const { id } = req.body;
 
-    if (!id || !quantityOut) {
-      return res
-        .status(400)
-        .json({ message: "Informe ID e quantidade de saída." });
+    if (!id) {
+      return res.status(400).json({ message: "Informe o ID do alimento." });
     }
 
     const foodRef = db.collection("foods").doc(String(id).trim().toUpperCase());
@@ -183,13 +187,7 @@ app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
       });
     }
 
-    const outputQty = Number(quantityOut);
-
-    if (outputQty <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Quantidade de saída deve ser maior que zero." });
-    }
+    const outputQty = 1;
 
     if (outputQty > food.quantity) {
       return res.status(400).json({

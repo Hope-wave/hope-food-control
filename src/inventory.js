@@ -37,11 +37,20 @@ function getDaysToExpire(validityDate) {
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
-function generateShortId() {
+function generateShortId(letterCount = 1, digitCount = 1) {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomLetter = letters.charAt(Math.floor(Math.random() * letters.length));
-  const randomDigit = Math.floor(Math.random() * 10);
-  return `${randomLetter}${randomDigit}`;
+  let letterPart = "";
+  let digitPart = "";
+
+  for (let i = 0; i < letterCount; i += 1) {
+    letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+
+  for (let i = 0; i < digitCount; i += 1) {
+    digitPart += String(Math.floor(Math.random() * 10));
+  }
+
+  return `${letterPart}${digitPart}`;
 }
 
 /**
@@ -57,17 +66,29 @@ function hasStock(food) {
 }
 
 async function createUniqueFoodId(db) {
-  for (let i = 0; i < 260; i += 1) {
-    const candidate = generateShortId();
-    // eslint-disable-next-line no-await-in-loop
-    const existing = await db.collection("foods").doc(candidate).get();
-    if (!existing.exists) {
-      return candidate;
+  const digitCount = 1;
+
+  for (let letterCount = 1; letterCount <= 6; letterCount += 1) {
+    const stageSpace = 26 ** letterCount * 10 ** digitCount;
+    const tried = new Set();
+
+    while (tried.size < stageSpace) {
+      const candidate = generateShortId(letterCount, digitCount);
+      if (tried.has(candidate)) {
+        continue;
+      }
+      tried.add(candidate);
+
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await db.collection("foods").doc(candidate).get();
+      if (!existing.exists) {
+        return candidate;
+      }
     }
   }
 
   throw new Error(
-    "Nao foi possivel gerar um novo ID no formato Letra+Numero (ex: A1)."
+    "Nao foi possivel gerar um novo ID simples para etiqueta."
   );
 }
 

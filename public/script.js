@@ -22,12 +22,28 @@ const foodForm = document.getElementById("food-form");
 const outputForm = document.getElementById("output-form");
 const logoutBtn = document.getElementById("logout-btn");
 const refreshAdminBtn = document.getElementById("refresh-admin-btn");
+const exportPdfBtn = document.getElementById("export-pdf-btn");
 
 const foodResult = document.getElementById("food-result");
 const outputResult = document.getElementById("output-result");
 const foodsTbody = document.getElementById("foods-tbody");
 const alertsList = document.getElementById("alerts-list");
 const loginResult = document.getElementById("login-result");
+const foodsPagination = document.getElementById("foods-pagination");
+const foodsPrevBtn = document.getElementById("foods-prev-btn");
+const foodsNextBtn = document.getElementById("foods-next-btn");
+const foodsPageInfo = document.getElementById("foods-page-info");
+const alertsPagination = document.getElementById("alerts-pagination");
+const alertsPrevBtn = document.getElementById("alerts-prev-btn");
+const alertsNextBtn = document.getElementById("alerts-next-btn");
+const alertsPageInfo = document.getElementById("alerts-page-info");
+
+const FOODS_PAGE_SIZE = 10;
+const ALERTS_PAGE_SIZE = 8;
+let foodsPage = 1;
+let alertsPage = 1;
+let allFoods = [];
+let allAlerts = [];
 
 function getApiOrigin() {
   const el = document.querySelector('meta[name="hope-api-origin"]');
@@ -157,38 +173,123 @@ function statusLabel(status) {
   return "Normal";
 }
 
+function formatDatePtBr(dateIso) {
+  const raw = String(dateIso || "").trim();
+  if (!raw) {
+    return "—";
+  }
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return raw;
+  }
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+function formatDateTimePtBr(dateValue) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(dateValue);
+}
+
+function updateExportButtonState() {
+  if (!exportPdfBtn) {
+    return;
+  }
+  exportPdfBtn.disabled = !allFoods.length;
+}
+
+function clampPage(page, totalItems, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  return Math.min(Math.max(page, 1), totalPages);
+}
+
+function updatePaginationControls({
+  totalItems,
+  page,
+  pageSize,
+  container,
+  prevBtn,
+  nextBtn,
+  infoEl
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const hasMultiplePages = totalPages > 1;
+  container.classList.toggle("hidden", !hasMultiplePages);
+  prevBtn.disabled = page <= 1;
+  nextBtn.disabled = page >= totalPages;
+  infoEl.textContent = `Página ${page} de ${totalPages}`;
+}
+
 function renderFoods(foods) {
   foodsTbody.innerHTML = "";
+  foodsPage = clampPage(foodsPage, foods.length, FOODS_PAGE_SIZE);
+  updateExportButtonState();
+
   if (!foods.length) {
     foodsTbody.innerHTML = `<tr><td colspan="6">Nenhum alimento com estoque no momento.</td></tr>`;
+    foodsPagination.classList.add("hidden");
     return;
   }
 
-  foods.forEach((food) => {
+  const start = (foodsPage - 1) * FOODS_PAGE_SIZE;
+  const pageFoods = foods.slice(start, start + FOODS_PAGE_SIZE);
+
+  pageFoods.forEach((food) => {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${food.id}</td>
       <td>${food.name}</td>
       <td>${food.quantity}</td>
       <td>${food.weight != null && food.weight !== "" ? food.weight : "—"}</td>
-      <td>${food.validityDate}</td>
+      <td>${formatDatePtBr(food.validityDate)}</td>
       <td><span class="status ${food.status}">${statusLabel(food.status)}</span></td>
     `;
     foodsTbody.appendChild(row);
+  });
+
+  updatePaginationControls({
+    totalItems: foods.length,
+    page: foodsPage,
+    pageSize: FOODS_PAGE_SIZE,
+    container: foodsPagination,
+    prevBtn: foodsPrevBtn,
+    nextBtn: foodsNextBtn,
+    infoEl: foodsPageInfo
   });
 }
 
 function renderAlerts(alerts) {
   alertsList.innerHTML = "";
+  alertsPage = clampPage(alertsPage, alerts.length, ALERTS_PAGE_SIZE);
+
   if (!alerts.length) {
     alertsList.innerHTML = "<li>Nenhum alerta de vencimento.</li>";
+    alertsPagination.classList.add("hidden");
     return;
   }
 
-  alerts.forEach((food) => {
+  const start = (alertsPage - 1) * ALERTS_PAGE_SIZE;
+  const pageAlerts = alerts.slice(start, start + ALERTS_PAGE_SIZE);
+
+  pageAlerts.forEach((food) => {
     const item = document.createElement("li");
     item.textContent = `${food.id} - ${food.name} vence em ${food.daysToExpire} dia(s)`;
     alertsList.appendChild(item);
+  });
+
+  updatePaginationControls({
+    totalItems: alerts.length,
+    page: alertsPage,
+    pageSize: ALERTS_PAGE_SIZE,
+    container: alertsPagination,
+    prevBtn: alertsPrevBtn,
+    nextBtn: alertsNextBtn,
+    infoEl: alertsPageInfo
   });
 }
 
@@ -227,7 +328,7 @@ function renderBasketPlan(plan) {
         <td>${item.categoryLabel}</td>
         <td><span class="basket-food-id">${item.foodId}</span></td>
         <td>${item.foodName}</td>
-        <td>${item.validityDate}</td>
+        <td>${formatDatePtBr(item.validityDate)}</td>
         <td>${formatDaysLabel(item.daysToExpire)}</td>
         <td>${item.quantityOut}</td>
       `;
@@ -279,11 +380,58 @@ async function loadAdminData() {
       api("/api/admin/foods"),
       api("/api/admin/alerts")
     ]);
-    renderFoods(foodsData.foods);
-    renderAlerts(alertsData.alerts);
+    allFoods = foodsData.foods || [];
+    allAlerts = alertsData.alerts || [];
+    foodsPage = 1;
+    alertsPage = 1;
+    renderFoods(allFoods);
+    renderAlerts(allAlerts);
   } catch (error) {
     alertsList.innerHTML = `<li>${error.message}</li>`;
+    allFoods = [];
+    updateExportButtonState();
   }
+}
+
+function exportFoodsPdf() {
+  if (!allFoods.length) {
+    showMessage(outputResult, "Nao ha itens no estoque para exportar.", true);
+    return;
+  }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showMessage(outputResult, "Biblioteca de PDF nao carregada no navegador.", true);
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const generatedAt = new Date();
+
+  doc.setFontSize(14);
+  doc.text("Base Hope - Estoque completo", 40, 38);
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${formatDateTimePtBr(generatedAt)}`, 40, 56);
+
+  const tableRows = allFoods.map((food) => [
+    food.id,
+    food.name,
+    String(food.quantity),
+    food.weight != null && food.weight !== "" ? String(food.weight) : "-",
+    formatDatePtBr(food.validityDate),
+    statusLabel(food.status)
+  ]);
+
+  doc.autoTable({
+    startY: 72,
+    head: [["ID", "Nome", "Quantidade", "Peso (kg)", "Validade", "Status"]],
+    body: tableRows,
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [99, 52, 218] }
+  });
+
+  const stamp = generatedAt.toISOString().slice(0, 10);
+  doc.save(`estoque-completo-${stamp}.pdf`);
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -321,7 +469,7 @@ foodForm.addEventListener("submit", async (event) => {
         : String(weightRaw).trim();
     const body = {
       name: formData.get("name"),
-      quantity: Number(formData.get("quantity")),
+      quantity: 1,
       validityDate: formData.get("validityDate")
     };
     if (weightTrimmed !== "") {
@@ -348,7 +496,7 @@ outputForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: {
         id: String(formData.get("id")).toUpperCase().trim(),
-        quantityOut: Number(formData.get("quantityOut"))
+        quantityOut: 1
       }
     });
     outputForm.reset();
@@ -371,6 +519,30 @@ logoutBtn.addEventListener("click", async () => {
 
 refreshAdminBtn.addEventListener("click", async () => {
   await loadAdminData();
+});
+
+if (exportPdfBtn) {
+  exportPdfBtn.addEventListener("click", exportFoodsPdf);
+}
+
+foodsPrevBtn.addEventListener("click", () => {
+  foodsPage -= 1;
+  renderFoods(allFoods);
+});
+
+foodsNextBtn.addEventListener("click", () => {
+  foodsPage += 1;
+  renderFoods(allFoods);
+});
+
+alertsPrevBtn.addEventListener("click", () => {
+  alertsPage -= 1;
+  renderAlerts(allAlerts);
+});
+
+alertsNextBtn.addEventListener("click", () => {
+  alertsPage += 1;
+  renderAlerts(allAlerts);
 });
 
 basketPlanBtn.addEventListener("click", async () => {
