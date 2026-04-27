@@ -128,6 +128,7 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
       const shortId = await createUniqueFoodId(db);
+      const foodRef = db.collection("foods").doc(shortId);
       const payload = {
         id: shortId,
         name: nameTrimmed,
@@ -141,15 +142,23 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
       };
 
       try {
-        // "create" falha se o doc ja existir: evita sobrescrever em corrida simultanea.
+        // Transacao evita sobrescrever em corrida simultanea mesmo sem docRef.create().
         // eslint-disable-next-line no-await-in-loop
-        await db.collection("foods").doc(shortId).create(payload);
+        await db.runTransaction(async (tx) => {
+          const existing = await tx.get(foodRef);
+          if (existing.exists) {
+            const err = new Error("duplicate-id");
+            err.code = "duplicate-id";
+            throw err;
+          }
+          tx.set(foodRef, payload);
+        });
         return res.status(201).json(payload);
       } catch (error) {
         const alreadyExists =
+          error?.code === "duplicate-id" ||
           error?.code === 6 ||
-          error?.code === "already-exists" ||
-          String(error?.message || "").toLowerCase().includes("already exists");
+          error?.code === "already-exists";
         if (!alreadyExists) {
           throw error;
         }
