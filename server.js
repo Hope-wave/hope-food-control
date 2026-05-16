@@ -16,7 +16,22 @@ const {
 const { planBasicBasket, buildPickListForVolunteer } = require("./src/basket");
 
 const app = express();
-const db = initFirebase();
+const { db, useFirestoreSessionStore } = initFirebase();
+
+const isProduction = process.env.NODE_ENV === "production";
+if (process.env.VERCEL || isProduction) {
+  app.set("trust proxy", 1);
+}
+
+function sessionCookieSecure() {
+  if (process.env.SESSION_COOKIE_SECURE === "true") {
+    return true;
+  }
+  if (process.env.SESSION_COOKIE_SECURE === "false") {
+    return false;
+  }
+  return Boolean(process.env.VERCEL);
+}
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -54,8 +69,9 @@ function devCors(req, res, next) {
 app.use(devCors);
 
 app.use(express.json());
-app.use(
-  session({
+
+function createSessionMiddleware() {
+  const sessionOptions = {
     name: "hope.sid",
     secret: process.env.SESSION_SECRET || "hope-secret-dev",
     resave: false,
@@ -63,10 +79,32 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false
+      secure: sessionCookieSecure()
     }
-  })
-);
+  };
+
+  if (useFirestoreSessionStore) {
+    const FirestoreStore = require("firestore-store")(session);
+    return session({
+      ...sessionOptions,
+      store: new FirestoreStore({
+        database: db,
+        collection: "hope_sessions"
+      })
+    });
+  }
+
+  if (isProduction) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "Sessoes em memoria nao persistem na Vercel (varias instancias). Configure FIREBASE_SERVICE_ACCOUNT_JSON no painel."
+    );
+  }
+
+  return session(sessionOptions);
+}
+
+app.use(createSessionMiddleware());
 
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;

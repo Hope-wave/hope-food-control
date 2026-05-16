@@ -44,6 +44,14 @@ function createInMemoryDb() {
                 data: () => value
               };
             },
+            async create(payload) {
+              if (collectionStore.has(key)) {
+                const err = new Error("Document already exists.");
+                err.code = 6;
+                throw err;
+              }
+              collectionStore.set(key, payload);
+            },
             async set(payload) {
               collectionStore.set(key, payload);
             },
@@ -103,7 +111,7 @@ function buildServiceAccount() {
 
 function initFirebase() {
   if (admin.apps.length > 0) {
-    return admin.firestore();
+    return { db: admin.firestore(), useFirestoreSessionStore: true };
   }
 
   let serviceAccount = null;
@@ -112,7 +120,7 @@ function initFirebase() {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn(`Falha ao inicializar Firebase: ${error.message}`);
-    return createInMemoryDb();
+    return { db: createInMemoryDb(), useFirestoreSessionStore: false };
   }
 
   if (!serviceAccount) {
@@ -120,7 +128,7 @@ function initFirebase() {
     console.warn(
       "Firebase nao configurado. Rodando em modo local (dados em memoria)."
     );
-    return createInMemoryDb();
+    return { db: createInMemoryDb(), useFirestoreSessionStore: false };
   }
 
   admin.initializeApp({
@@ -130,7 +138,7 @@ function initFirebase() {
 
   // eslint-disable-next-line no-console
   console.log("Firebase conectado com sucesso ao Firestore.");
-  return admin.firestore();
+  return { db: admin.firestore(), useFirestoreSessionStore: true };
 }
 
 module.exports = { initFirebase };
