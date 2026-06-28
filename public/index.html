@@ -5,82 +5,150 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="hope-api-origin" content="__HOPE_API_ORIGIN__" />
     <title>Base Hope - Controle de Alimentos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="auth-mode">
     <div class="bg-glow bg-glow-left"></div>
     <div class="bg-glow bg-glow-right"></div>
+
+    <section id="login-section" class="login-page">
+      <div class="login-shell">
+        <div class="login-panel">
+          <div class="login-panel-inner">
+            <div class="login-logo" aria-label="Hope Tech Igreja Onda">
+              <span class="logo-hope">hope</span>
+              <span class="logo-tech">Alimentos</span>
+              <span class="logo-church">igreja <strong>onda</strong></span>
+            </div>
+
+            <h2 class="login-title">Bem-vindo(a) de volta!</h2>
+            <p class="login-subtitle">Faça login para continuar</p>
+
+            <form id="login-form" class="login-form">
+              <label for="username">Usuário</label>
+              <div class="input-wrap">
+                <span class="input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </span>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="usuário"
+                  autocomplete="username"
+                  required
+                />
+              </div>
+
+              <label for="password">Senha</label>
+              <div class="input-wrap">
+                <span class="input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  id="toggle-password"
+                  class="password-toggle"
+                  aria-label="Mostrar senha"
+                >
+                  <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <svg class="icon-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                </button>
+              </div>
+
+              <button type="submit" class="login-submit">Entrar</button>
+            </form>
+
+            <div id="login-result" class="result login-result hidden"></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="login-footer">
+        © 2026 Hope. Todos os direitos reservados.
+      </footer>
+    </section>
+
     <main class="container">
       <header class="hero">
-        <span class="tag">BASE HOPE</span>
+        <div class="hero-brand" aria-label="Hope Tech Igreja Onda">
+          <span class="logo-hope">hope</span>
+          <span class="logo-tech">Alimentos</span>
+          <span class="logo-church">igreja <strong>onda</strong></span>
+        </div>
         <h1>Controle de estoque de alimentos</h1>
         <p>Sistema para controle de estoque de alimentos do Hope</p>
       </header>
 
-      <section id="login-section" class="card">
-        <div class="login-layout">
-          <div class="login-brand">
-            <h2>Bem-vindo(a)!</h2>
-            <p class="section-description">
-              Faça login para registrar entradas e saídas de alimentos e cestas básicas.
-            </p>
-          </div>
-
-          <div class="login-form-card">
-            <h3>Entrar no sistema</h3>
-            <p class="section-description">
-              Use seu login para acessar as funções disponíveis.
-            </p>
-            <p class="section-description">
-              Não compartilhe seu acesso com outras pessoas.
-            </p>
-            <form id="login-form">
-              <label for="username">Usuário</label>
-              <input id="username" name="username" type="text" required />
-
-              <label for="password">Senha</label>
-              <input id="password" name="password" type="password" required />
-
-              <button type="submit">Entrar</button>
-            </form>
-            <div id="login-result" class="result hidden"></div>
-          </div>
-        </div>
-      </section>
-
       <section id="app-section" class="hidden">
         <div class="card top-bar">
-          <div>
-            <h2>Painel</h2>
+          <div class="top-bar-info">
+
             <p id="welcome-text"></p>
           </div>
           <button id="logout-btn" class="secondary">Sair</button>
         </div>
 
         <section id="basket-panel" class="card basket-section hidden">
-          <h3>Cesta básica</h3>
-          <p class="section-description">
-            Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
-            estoque. A ordem é por validade mais próxima. Os 7 itens da base são
-            obrigatórios; adicionais entram quando houver estoque — se faltar adicional, a
-            cesta ainda pode sair.
-          </p>
+          <div class="section-head">
+            <span class="section-badge">Cesta básica</span>
+            <h3>Montagem e saída</h3>
+            <p class="section-description">
+              Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
+              estoque. A ordem é por validade mais próxima. Os 7 itens da base são
+              obrigatórios; adicionais entram quando houver estoque, se faltar adicional, a
+              cesta ainda pode sair.
+            </p>
+          </div>
+
           <div class="basket-toolbar">
             <button type="button" id="basket-plan-btn">Calcular montagem</button>
             <button type="button" id="basket-checkout-btn" class="secondary" disabled>
               Registrar saída desta cesta
             </button>
           </div>
-          <label for="basket-notes">Observações (opcional)</label>
-          <textarea
-            id="basket-notes"
-            name="basketNotes"
-            rows="2"
-            maxlength="500"
-            placeholder="Ex.: família X, entrega no bairro Y"
-          ></textarea>
+
+          <div class="basket-notes-block">
+            <label for="basket-notes">Observações (opcional)</label>
+            <textarea
+              id="basket-notes"
+              name="basketNotes"
+              rows="2"
+              maxlength="500"
+              placeholder="Ex.: família X, entrega no bairro Y"
+            ></textarea>
+          </div>
+
           <div id="basket-result" class="result hidden"></div>
           <p id="basket-hint" class="hint hidden"></p>
+
           <div class="table-wrapper hidden" id="basket-table-wrap">
             <table>
               <thead>
@@ -102,13 +170,20 @@
         </section>
 
         <section id="volunteer-panel" class="hidden">
-          <div class="grid">
-            <article class="card">
-              <h3>Cadastro de Alimento</h3>
-              <p class="section-description">
-                Registre entradas no estoque e gere o ID de etiquetagem.
-              </p>
-              <form id="food-form">
+          
+
+          <div class="grid volunteer-grid">
+            <article class="card action-card action-card-entry">
+              <div class="action-card-top">
+                <span class="action-step" aria-hidden="true">1</span>
+                <div>
+                  <h3>Cadastro de Alimento</h3>
+                  <p class="section-description">
+                    Registre entradas no estoque e gere o ID de etiquetagem.
+                  </p>
+                </div>
+              </div>
+              <form id="food-form" class="action-form">
                 <label for="food-name">Nome</label>
                 <input id="food-name" name="name" type="text" required />
 
@@ -134,12 +209,17 @@
               <div id="food-result" class="result hidden"></div>
             </article>
 
-            <article class="card">
-              <h3>Registrar Saída</h3>
-              <p class="section-description">
-                Informe o ID da etiqueta para retirar 1 unidade.
-              </p>
-              <form id="output-form">
+            <article class="card action-card action-card-exit">
+              <div class="action-card-top">
+                <span class="action-step" aria-hidden="true">2</span>
+                <div>
+                  <h3>Registrar Saída</h3>
+                  <p class="section-description">
+                    Informe o ID da etiqueta para retirar 1 unidade.
+                  </p>
+                </div>
+              </div>
+              <form id="output-form" class="action-form">
                 <label for="output-id">ID do alimento</label>
                 <input
                   id="output-id"
