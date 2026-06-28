@@ -136,6 +136,7 @@ function showMessage(container, text, isError = false) {
 
 function showApp(user) {
   currentUser = user;
+  document.body.classList.remove("auth-mode");
   loginSection.classList.add("hidden");
   appSection.classList.remove("hidden");
   const roleLabel = user.role === "admin" ? "Administrador" : "Voluntário";
@@ -151,6 +152,7 @@ function showApp(user) {
 function showLogin() {
   currentUser = null;
   lastBasketPlan = null;
+  document.body.classList.add("auth-mode");
   appSection.classList.add("hidden");
   loginSection.classList.remove("hidden");
   basketPanel.classList.add("hidden");
@@ -432,6 +434,19 @@ function exportFoodsPdf() {
 
   const stamp = generatedAt.toISOString().slice(0, 10);
   doc.save(`estoque-completo-${stamp}.pdf`);
+}
+
+const passwordInput = document.getElementById("password");
+const togglePasswordBtn = document.getElementById("toggle-password");
+
+if (togglePasswordBtn && passwordInput) {
+  togglePasswordBtn.addEventListener("click", () => {
+    const isHidden = passwordInput.type === "password";
+    passwordInput.type = isHidden ? "text" : "password";
+    togglePasswordBtn.setAttribute("aria-label", isHidden ? "Ocultar senha" : "Mostrar senha");
+    togglePasswordBtn.querySelector(".icon-eye").classList.toggle("hidden", !isHidden);
+    togglePasswordBtn.querySelector(".icon-eye-off").classList.toggle("hidden", isHidden);
+  });
 }
 
 loginForm.addEventListener("submit", async (event) => {
