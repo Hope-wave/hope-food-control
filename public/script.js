@@ -37,6 +37,24 @@ const alertsPagination = document.getElementById("alerts-pagination");
 const alertsPrevBtn = document.getElementById("alerts-prev-btn");
 const alertsNextBtn = document.getElementById("alerts-next-btn");
 const alertsPageInfo = document.getElementById("alerts-page-info");
+const dashboardMonth = document.getElementById("dashboard-month");
+const metricEntries = document.getElementById("metric-entries");
+const metricFoodOutputs = document.getElementById("metric-food-outputs");
+const metricBaskets = document.getElementById("metric-baskets");
+const metricStockUnits = document.getElementById("metric-stock-units");
+const metricFoodTypes = document.getElementById("metric-food-types");
+const metricExpiringSoon = document.getElementById("metric-expiring-soon");
+const metricExpired = document.getElementById("metric-expired");
+const metricAverageBasket = document.getElementById("metric-average-basket");
+const dashboardMonthSelect = document.getElementById("dashboard-month-select");
+const stockCategoryList = document.getElementById("stock-category-list");
+const stockFoodList = document.getElementById("stock-food-list");
+const movementChart = document.getElementById("movement-chart");
+const confirmationDialog = document.getElementById("confirmation-dialog");
+const confirmationTitle = document.getElementById("confirmation-title");
+const confirmationMessage = document.getElementById("confirmation-message");
+const confirmationDetails = document.getElementById("confirmation-details");
+const confirmationConfirmBtn = document.getElementById("confirmation-confirm-btn");
 
 const FOODS_PAGE_SIZE = 10;
 const ALERTS_PAGE_SIZE = 8;
@@ -44,6 +62,8 @@ let foodsPage = 1;
 let alertsPage = 1;
 let allFoods = [];
 let allAlerts = [];
+let confirmationResolver = null;
+let selectedDashboardMonth = "";
 
 function getApiOrigin() {
   const el = document.querySelector('meta[name="hope-api-origin"]');
@@ -128,11 +148,50 @@ async function api(path, options = {}) {
   return data;
 }
 
-function showMessage(container, text, isError = false) {
-  container.classList.remove("hidden", "error");
+function showMessage(container, text, isError = false, isWarning = false) {
+  container.classList.remove("hidden", "error", "warning");
   if (isError) container.classList.add("error");
+  if (isWarning) container.classList.add("warning");
   container.textContent = text;
 }
+
+function requestConfirmation({ title, message, details, confirmLabel }) {
+  if (confirmationDialog.open) {
+    return Promise.resolve(false);
+  }
+
+  confirmationTitle.textContent = title;
+  confirmationMessage.textContent = message;
+  confirmationConfirmBtn.textContent = confirmLabel;
+  confirmationDetails.innerHTML = "";
+
+  details.forEach(([label, value]) => {
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = value;
+    confirmationDetails.append(term, description);
+  });
+
+  return new Promise((resolve) => {
+    confirmationResolver = resolve;
+    confirmationDialog.showModal();
+  });
+}
+
+confirmationDialog.addEventListener("close", () => {
+  if (confirmationResolver) {
+    const resolve = confirmationResolver;
+    confirmationResolver = null;
+    resolve(confirmationDialog.returnValue === "confirm");
+  }
+});
+
+confirmationDialog.addEventListener("click", (event) => {
+  if (event.target === confirmationDialog) {
+    confirmationDialog.close("cancel");
+  }
+});
 
 function showApp(user) {
   currentUser = user;
@@ -295,6 +354,120 @@ function renderAlerts(alerts) {
   });
 }
 
+function renderDashboardMonthSelect(months, selectedMonth) {
+  dashboardMonthSelect.innerHTML = "";
+  (months || []).forEach((month) => {
+    const option = document.createElement("option");
+    option.value = month.key;
+    option.textContent = month.label;
+    option.selected = month.key === selectedMonth;
+    dashboardMonthSelect.appendChild(option);
+  });
+  dashboardMonthSelect.disabled = !months?.length;
+}
+
+function renderStockCategoryList(categories) {
+  stockCategoryList.innerHTML = "";
+  if (!categories?.length) {
+    stockCategoryList.textContent = "Nenhum alimento disponível no estoque.";
+    return;
+  }
+
+  categories.forEach((category) => {
+    const item = document.createElement("div");
+    item.className = "stock-category-item";
+    const label = document.createElement("span");
+    label.textContent = category.label;
+    const quantity = document.createElement("strong");
+    quantity.textContent = `${category.quantity} un.`;
+    item.append(label, quantity);
+    stockCategoryList.appendChild(item);
+  });
+}
+
+function renderStockFoodList(foods) {
+  stockFoodList.innerHTML = "";
+  if (!foods?.length) {
+    stockFoodList.textContent = "Nenhum alimento disponível no estoque.";
+    return;
+  }
+
+  const maxQuantity = Math.max(...foods.map((food) => food.quantity), 1);
+  foods.forEach((food) => {
+    const item = document.createElement("div");
+    item.className = "stock-food-item";
+    const line = document.createElement("div");
+    line.className = "stock-food-line";
+    const name = document.createElement("span");
+    name.textContent = food.name;
+    const quantity = document.createElement("strong");
+    quantity.textContent = `${food.quantity} un.`;
+    line.append(name, quantity);
+    const track = document.createElement("div");
+    track.className = "stock-food-track";
+    const fill = document.createElement("span");
+    fill.style.width = `${(food.quantity / maxQuantity) * 100}%`;
+    track.appendChild(fill);
+    item.append(line, track);
+    stockFoodList.appendChild(item);
+  });
+}
+
+function renderMovementChart(history) {
+  movementChart.innerHTML = "";
+  if (!history?.length) {
+    movementChart.textContent = "Ainda não há movimentações registradas.";
+    return;
+  }
+
+  const highestValue = Math.max(
+    ...history.flatMap((month) => [month.entries, month.foodOutputs, month.baskets]),
+    1
+  );
+  history.forEach((month) => {
+    const item = document.createElement("div");
+    item.className = "movement-chart-item";
+    const label = document.createElement("span");
+    label.className = "movement-chart-label";
+    label.textContent = month.label;
+    const bars = document.createElement("div");
+    bars.className = "movement-bars";
+    [
+      ["entry", month.entries, "Entradas"],
+      ["output", month.foodOutputs, "Saídas"],
+      ["basket", month.baskets, "Cestas"]
+    ].forEach(([type, value, labelText]) => {
+      const bar = document.createElement("span");
+      bar.className = `movement-bar ${type}`;
+      bar.style.width = `${(value / highestValue) * 100}%`;
+      bar.title = `${labelText}: ${value}`;
+      bar.setAttribute("aria-label", `${labelText}: ${value}`);
+      bars.appendChild(bar);
+    });
+    item.append(label, bars);
+    movementChart.appendChild(item);
+  });
+}
+
+function renderDashboard(data) {
+  const metrics = data.metrics || {};
+  const month = data.month || {};
+  selectedDashboardMonth = month.key || "";
+  dashboardMonth.textContent = `Dados de ${month.label || "mês atual"}`;
+  metricEntries.textContent = metrics.entries ?? 0;
+  metricFoodOutputs.textContent = metrics.foodOutputs ?? 0;
+  metricBaskets.textContent = metrics.baskets ?? 0;
+  metricStockUnits.textContent = metrics.stockUnits ?? 0;
+  metricFoodTypes.textContent = metrics.foodTypesInStock ?? 0;
+  metricExpiringSoon.textContent = metrics.expiringSoon ?? 0;
+  metricExpired.textContent = metrics.expired ?? 0;
+  metricAverageBasket.textContent = metrics.averageItemsPerBasket ?? 0;
+  renderDashboardMonthSelect(data.months, selectedDashboardMonth);
+  renderStockCategoryList(data.stockByCategory);
+  renderStockFoodList(data.stockByFood);
+  renderMovementChart(data.history);
+}
+
 function formatDaysLabel(days) {
   if (days === null || days === undefined) {
     return "—";
@@ -351,19 +524,32 @@ function renderBasketPlan(plan) {
     basketSkippedList.classList.add("hidden");
   }
 
+  const missing = (plan.missingBase || []).map((m) => m.label).join(", ");
+
   if (!plan.canAssemble) {
-    const missing = (plan.missingBase || [])
-      .map((m) => m.label)
-      .join(", ");
     showMessage(
       basketResult,
-      `Faltam itens obrigatórios no estoque: ${missing}. Cadastre ou repor estoque antes de dar baixa.`,
+      "Não há alimentos disponíveis para registrar a saída da cesta.",
       true
     );
     basketHint.textContent =
-      "Dica: use nomes claros no cadastro (ex.: “Arroz tipo 1”, “Feijão carioca”) para o sistema reconhecer a base.";
+      "Cadastre alimentos no estoque antes de registrar uma saída de cesta.";
     basketHint.classList.remove("hidden");
     basketCheckoutBtn.disabled = true;
+    return;
+  }
+
+  if (missing) {
+    showMessage(
+      basketResult,
+      `Atenção: faltam itens obrigatórios no estoque: ${missing}. A saída será registrada com os itens disponíveis.`,
+      false,
+      true
+    );
+    basketHint.textContent =
+      "Você pode continuar. Reponha os itens faltantes assim que possível para completar as próximas cestas.";
+    basketHint.classList.remove("hidden");
+    basketCheckoutBtn.disabled = false;
     return;
   }
 
@@ -378,9 +564,13 @@ function renderBasketPlan(plan) {
 
 async function loadAdminData() {
   try {
-    const [foodsData, alertsData] = await Promise.all([
+    const dashboardQuery = selectedDashboardMonth
+      ? `?month=${encodeURIComponent(selectedDashboardMonth)}`
+      : "";
+    const [foodsData, alertsData, dashboardData] = await Promise.all([
       api("/api/admin/foods"),
-      api("/api/admin/alerts")
+      api("/api/admin/alerts"),
+      api(`/api/admin/dashboard${dashboardQuery}`)
     ]);
     allFoods = foodsData.foods || [];
     allAlerts = alertsData.alerts || [];
@@ -388,6 +578,7 @@ async function loadAdminData() {
     alertsPage = 1;
     renderFoods(allFoods);
     renderAlerts(allAlerts);
+    renderDashboard(dashboardData);
   } catch (error) {
     alertsList.innerHTML = `<li>${error.message}</li>`;
     allFoods = [];
@@ -491,6 +682,20 @@ foodForm.addEventListener("submit", async (event) => {
       body.weight = Number(weightTrimmed);
     }
 
+    const confirmed = await requestConfirmation({
+      title: "Confirmar cadastro de alimento",
+      message: "Revise os dados antes de salvar no estoque.",
+      details: [
+        ["Alimento", body.name],
+        ["Peso", body.weight != null ? `${body.weight} kg` : "Não informado"],
+        ["Validade", formatDatePtBr(body.validityDate)]
+      ],
+      confirmLabel: "Confirmar cadastro"
+    });
+    if (!confirmed) {
+      return;
+    }
+
     const created = await api("/api/foods", {
       method: "POST",
       body
@@ -507,10 +712,24 @@ outputForm.addEventListener("submit", async (event) => {
   const formData = new FormData(outputForm);
 
   try {
+    const foodId = String(formData.get("id")).toUpperCase().trim();
+    const confirmed = await requestConfirmation({
+      title: "Confirmar baixa de alimento",
+      message: "Esta operação reduzirá uma unidade do estoque.",
+      details: [
+        ["ID da etiqueta", foodId],
+        ["Quantidade de saída", "1 unidade"]
+      ],
+      confirmLabel: "Confirmar baixa"
+    });
+    if (!confirmed) {
+      return;
+    }
+
     const output = await api("/api/foods/output", {
       method: "POST",
       body: {
-        id: String(formData.get("id")).toUpperCase().trim(),
+        id: foodId,
         quantityOut: 1
       }
     });
@@ -533,6 +752,11 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 refreshAdminBtn.addEventListener("click", async () => {
+  await loadAdminData();
+});
+
+dashboardMonthSelect.addEventListener("change", async () => {
+  selectedDashboardMonth = dashboardMonthSelect.value;
   await loadAdminData();
 });
 
@@ -586,7 +810,21 @@ basketCheckoutBtn.addEventListener("click", async () => {
   }
 
   try {
-    await api("/api/baskets/basic/checkout", {
+    const itemCount = lastBasketPlan.summary?.totalLines || 0;
+    const confirmed = await requestConfirmation({
+      title: "Confirmar saída da cesta",
+      message: "Os itens listados serão baixados do estoque.",
+      details: [
+        ["Itens da cesta", `${itemCount} item(ns)`],
+        ["Observações", basketNotes.value.trim() || "Não informado"]
+      ],
+      confirmLabel: "Confirmar saída"
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    const output = await api("/api/baskets/basic/checkout", {
       method: "POST",
       body: { notes: basketNotes.value }
     });
@@ -597,10 +835,14 @@ basketCheckoutBtn.addEventListener("click", async () => {
     basketPlanTbody.innerHTML = "";
     basketSkippedList.classList.add("hidden");
     basketSkippedList.innerHTML = "";
+    const missing = (output.missingBase || []).map((item) => item.label).join(", ");
     showMessage(
       basketResult,
-      "Baixa da cesta registrada. Cada item foi descontado no cadastro de alimentos.",
-      false
+      missing
+        ? `Baixa registrada com os itens disponíveis. Faltaram: ${missing}.`
+        : "Baixa da cesta registrada. Cada item foi descontado no cadastro de alimentos.",
+      false,
+      Boolean(missing)
     );
     if (currentUser?.role === "admin") {
       await loadAdminData();

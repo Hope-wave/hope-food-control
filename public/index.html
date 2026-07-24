@@ -237,6 +237,101 @@
         </section>
 
         <section id="admin-panel" class="hidden">
+          <section class="dashboard-section" aria-labelledby="dashboard-title">
+            <div class="dashboard-heading">
+              <div>
+                <span class="section-badge">Visão gerencial</span>
+                <h2 id="dashboard-title">Dashboard do mês</h2>
+                <p id="dashboard-month" class="section-description">Carregando métricas...</p>
+              </div>
+              <div class="dashboard-period">
+                <label for="dashboard-month-select">Mês de referência</label>
+                <select id="dashboard-month-select" disabled>
+                  <option>Carregando...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="dashboard-metrics">
+              <article class="metric-card metric-card-entry">
+                <span class="metric-label">Entradas no mês</span>
+                <strong id="metric-entries" class="metric-value">—</strong>
+                <span class="metric-detail">itens recebidos</span>
+              </article>
+              <article class="metric-card metric-card-output">
+                <span class="metric-label">Saídas de alimentos</span>
+                <strong id="metric-food-outputs" class="metric-value">—</strong>
+                <span class="metric-detail">itens entregues</span>
+              </article>
+              <article class="metric-card metric-card-basket">
+                <span class="metric-label">Cestas entregues</span>
+                <strong id="metric-baskets" class="metric-value">—</strong>
+                <span class="metric-detail">cestas básicas</span>
+              </article>
+              <article class="metric-card metric-card-stock">
+                <span class="metric-label">Estoque atual</span>
+                <strong id="metric-stock-units" class="metric-value">—</strong>
+                <span class="metric-detail">itens disponíveis</span>
+              </article>
+            </div>
+
+            <div class="dashboard-insights">
+              <article class="dashboard-insight">
+                <span>Tipos de alimentos em estoque</span>
+                <strong id="metric-food-types">—</strong>
+              </article>
+              <article class="dashboard-insight warning">
+                <span>Itens próximos do vencimento</span>
+                <strong id="metric-expiring-soon">—</strong>
+              </article>
+              <article class="dashboard-insight danger">
+                <span>Itens vencidos no estoque</span>
+                <strong id="metric-expired">—</strong>
+              </article>
+              <article class="dashboard-insight">
+                <span>Média de itens por cesta</span>
+                <strong id="metric-average-basket">—</strong>
+              </article>
+            </div>
+
+            <div class="dashboard-data-grid">
+              <article class="dashboard-data-card">
+                <div class="dashboard-card-heading">
+                  <div>
+                    <h3>Estoque por categoria</h3>
+                    <p>Visão agrupada de arroz, feijão e demais categorias.</p>
+                  </div>
+                </div>
+                <div id="stock-category-list" class="stock-category-list"></div>
+              </article>
+
+              <article class="dashboard-data-card">
+                <div class="dashboard-card-heading">
+                  <div>
+                    <h3>Estoque por alimento</h3>
+                    <p>Quantidade atual de cada alimento cadastrado.</p>
+                  </div>
+                </div>
+                <div id="stock-food-list" class="stock-food-list"></div>
+              </article>
+            </div>
+
+            <article class="dashboard-chart-card">
+              <div class="dashboard-card-heading">
+                <div>
+                  <h3>Movimentação mensal</h3>
+                  <p>Comparativo dos últimos 12 meses com movimentação.</p>
+                </div>
+                <div class="chart-legend" aria-label="Legenda do gráfico">
+                  <span><i class="legend-entry"></i>Entradas</span>
+                  <span><i class="legend-output"></i>Saídas</span>
+                  <span><i class="legend-basket"></i>Cestas</span>
+                </div>
+              </div>
+              <div id="movement-chart" class="movement-chart" aria-live="polite"></div>
+            </article>
+          </section>
+
           <div class="card">
             <h3>Alertas (vencimento em até 30 dias)</h3>
             <ul id="alerts-list" class="alerts-list"></ul>
@@ -281,6 +376,22 @@
         </section>
       </section>
     </main>
+
+    <dialog id="confirmation-dialog" class="confirmation-dialog" aria-labelledby="confirmation-title">
+      <div class="confirmation-dialog-content">
+        <span class="confirmation-icon" aria-hidden="true">?</span>
+        <h2 id="confirmation-title">Confirmar operação</h2>
+        <p id="confirmation-message" class="confirmation-message"></p>
+        <dl id="confirmation-details" class="confirmation-details"></dl>
+        <form method="dialog" class="confirmation-actions">
+          <button type="submit" value="cancel" class="secondary">Cancelar</button>
+          <button id="confirmation-confirm-btn" type="submit" value="confirm">
+            Confirmar
+          </button>
+        </form>
+      </div>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="/script.js"></script>
