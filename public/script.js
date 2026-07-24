@@ -490,7 +490,7 @@ foodForm.addEventListener("submit", async (event) => {
     if (weightTrimmed !== "") {
       body.weight = Number(weightTrimmed);
     }
-
+// teste commit
     const created = await api("/api/foods", {
       method: "POST",
       body
