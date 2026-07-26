@@ -119,7 +119,7 @@
         <section id="basket-panel" class="card basket-section hidden">
           <div class="section-head">
             <span class="section-badge">Cesta básica</span>
-            <h3>Montagem e saída</h3>
+            <h3>Montagem de Cesta Básica</h3>
             <p class="section-description">
               Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
               estoque. A ordem é por validade mais próxima. Os 7 itens da base são
@@ -155,12 +155,9 @@
                 <tr>
                   <th>Ordem</th>
                   <th>Tipo</th>
-                  <th>Categoria</th>
                   <th>ID (etiqueta)</th>
-                  <th>Nome no cadastro</th>
+                  <th>Nome</th>
                   <th>Validade</th>
-                  <th>Dias</th>
-                  <th>Baixa (un.)</th>
                 </tr>
               </thead>
               <tbody id="basket-plan-tbody"></tbody>
@@ -302,7 +299,17 @@
                     <p>Visão agrupada de arroz, feijão e demais categorias.</p>
                   </div>
                 </div>
-                <div id="stock-category-list" class="stock-category-list"></div>
+                <div class="category-pie-chart" aria-live="polite">
+                  <div
+                    id="stock-category-pie"
+                    class="category-pie"
+                    role="img"
+                    aria-label="Distribuição do estoque por categoria"
+                  >
+                    <span id="stock-category-pie-total" class="category-pie-total"></span>
+                  </div>
+                  <ul id="stock-category-legend" class="category-pie-legend"></ul>
+                </div>
               </article>
 
               <article class="dashboard-data-card">
@@ -315,6 +322,26 @@
                 <div id="stock-food-list" class="stock-food-list"></div>
               </article>
             </div>
+
+            <article class="dashboard-data-card dashboard-entry-category-card">
+              <div class="dashboard-card-heading">
+                <div>
+                  <h3>Categorias que entraram no mês</h3>
+                  <p>Quantidade recebida por categoria no mês selecionado.</p>
+                </div>
+              </div>
+              <div class="category-pie-chart" aria-live="polite">
+                <div
+                  id="entry-category-pie"
+                  class="category-pie"
+                  role="img"
+                  aria-label="Distribuição das categorias que entraram no mês"
+                >
+                  <span id="entry-category-pie-total" class="category-pie-total"></span>
+                </div>
+                <ul id="entry-category-legend" class="category-pie-legend"></ul>
+              </div>
+            </article>
 
             <article class="dashboard-chart-card">
               <div class="dashboard-card-heading">

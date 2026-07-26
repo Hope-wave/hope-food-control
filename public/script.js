@@ -47,7 +47,12 @@ const metricExpiringSoon = document.getElementById("metric-expiring-soon");
 const metricExpired = document.getElementById("metric-expired");
 const metricAverageBasket = document.getElementById("metric-average-basket");
 const dashboardMonthSelect = document.getElementById("dashboard-month-select");
-const stockCategoryList = document.getElementById("stock-category-list");
+const entryCategoryPie = document.getElementById("entry-category-pie");
+const entryCategoryPieTotal = document.getElementById("entry-category-pie-total");
+const entryCategoryLegend = document.getElementById("entry-category-legend");
+const stockCategoryPie = document.getElementById("stock-category-pie");
+const stockCategoryPieTotal = document.getElementById("stock-category-pie-total");
+const stockCategoryLegend = document.getElementById("stock-category-legend");
 const stockFoodList = document.getElementById("stock-food-list");
 const movementChart = document.getElementById("movement-chart");
 const confirmationDialog = document.getElementById("confirmation-dialog");
@@ -58,6 +63,7 @@ const confirmationConfirmBtn = document.getElementById("confirmation-confirm-btn
 
 const FOODS_PAGE_SIZE = 10;
 const ALERTS_PAGE_SIZE = 8;
+const CATEGORY_CHART_COLORS = ["#1a37e6", "#20a36a", "#e59b1f", "#8c4fe8", "#df5a7c", "#1987bb"];
 let foodsPage = 1;
 let alertsPage = 1;
 let allFoods = [];
@@ -204,7 +210,8 @@ function showApp(user) {
   const showBasket = user.role === "volunteer" || user.role === "admin";
   basketPanel.classList.toggle("hidden", !showBasket);
 
-  volunteerPanel.classList.toggle("hidden", user.role !== "volunteer");
+  const canManageFoods = user.role === "volunteer" || user.role === "admin";
+  volunteerPanel.classList.toggle("hidden", !canManageFoods);
   adminPanel.classList.toggle("hidden", user.role !== "admin");
 }
 
@@ -366,22 +373,86 @@ function renderDashboardMonthSelect(months, selectedMonth) {
   dashboardMonthSelect.disabled = !months?.length;
 }
 
-function renderStockCategoryList(categories) {
-  stockCategoryList.innerHTML = "";
-  if (!categories?.length) {
-    stockCategoryList.textContent = "Nenhum alimento disponível no estoque.";
+function renderCategoryPieChart({
+  categories,
+  pie,
+  totalElement,
+  legend,
+  emptyMessage,
+  ariaLabel
+}) {
+  const chartCategories = (categories || []).filter(
+    (category) => Number(category.quantity) > 0
+  );
+  const total = chartCategories.reduce(
+    (sum, category) => sum + Number(category.quantity),
+    0
+  );
+
+  legend.innerHTML = "";
+  pie.classList.toggle("is-empty", total === 0);
+  totalElement.textContent = `${total} un.`;
+
+  if (!total) {
+    pie.style.background = "";
+    pie.setAttribute("aria-label", emptyMessage);
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "category-pie-empty";
+    emptyItem.textContent = emptyMessage;
+    legend.appendChild(emptyItem);
     return;
   }
 
-  categories.forEach((category) => {
-    const item = document.createElement("div");
-    item.className = "stock-category-item";
-    const label = document.createElement("span");
-    label.textContent = category.label;
-    const quantity = document.createElement("strong");
-    quantity.textContent = `${category.quantity} un.`;
-    item.append(label, quantity);
-    stockCategoryList.appendChild(item);
+  let start = 0;
+  const slices = chartCategories.map((category, index) => {
+    const end = start + (Number(category.quantity) / total) * 100;
+    const color = CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length];
+    const slice = `${color} ${start}% ${end}%`;
+    start = end;
+    return slice;
+  });
+  pie.style.background = `conic-gradient(${slices.join(", ")})`;
+  pie.setAttribute(
+    "aria-label",
+    `${ariaLabel}: ${chartCategories
+      .map((category) => `${category.label}: ${category.quantity} unidades`)
+      .join(", ")}`
+  );
+
+  chartCategories.forEach((category, index) => {
+    const item = document.createElement("li");
+    const color = CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length];
+    const percentage = Math.round((Number(category.quantity) / total) * 100);
+    const marker = document.createElement("i");
+    marker.style.backgroundColor = color;
+    const text = document.createElement("span");
+    text.textContent = category.label;
+    const value = document.createElement("strong");
+    value.textContent = `${category.quantity} un. (${percentage}%)`;
+    item.append(marker, text, value);
+    legend.appendChild(item);
+  });
+}
+
+function renderEntryCategoryChart(categories) {
+  renderCategoryPieChart({
+    categories,
+    pie: entryCategoryPie,
+    totalElement: entryCategoryPieTotal,
+    legend: entryCategoryLegend,
+    emptyMessage: "Nenhuma entrada registrada neste mês.",
+    ariaLabel: "Categorias que entraram no mês"
+  });
+}
+
+function renderStockCategoryChart(categories) {
+  renderCategoryPieChart({
+    categories,
+    pie: stockCategoryPie,
+    totalElement: stockCategoryPieTotal,
+    legend: stockCategoryLegend,
+    emptyMessage: "Nenhum alimento disponível no estoque.",
+    ariaLabel: "Estoque por categoria"
   });
 }
 
@@ -463,19 +534,10 @@ function renderDashboard(data) {
   metricExpired.textContent = metrics.expired ?? 0;
   metricAverageBasket.textContent = metrics.averageItemsPerBasket ?? 0;
   renderDashboardMonthSelect(data.months, selectedDashboardMonth);
-  renderStockCategoryList(data.stockByCategory);
+  renderEntryCategoryChart(data.entryCategories);
+  renderStockCategoryChart(data.stockByCategory);
   renderStockFoodList(data.stockByFood);
   renderMovementChart(data.history);
-}
-
-function formatDaysLabel(days) {
-  if (days === null || days === undefined) {
-    return "—";
-  }
-  if (days < 0) {
-    return `${days} (vencido)`;
-  }
-  return String(days);
 }
 
 function renderBasketPlan(plan) {
@@ -500,12 +562,9 @@ function renderBasketPlan(plan) {
       row.innerHTML = `
         <td>${orderCell}</td>
         <td><span class="basket-pill ${isBase ? "base" : "extra"}">${isBase ? "Base" : "Adicional"}</span></td>
-        <td>${item.categoryLabel}</td>
         <td><span class="basket-food-id">${item.foodId}</span></td>
         <td>${item.foodName}</td>
         <td>${formatDatePtBr(item.validityDate)}</td>
-        <td>${formatDaysLabel(item.daysToExpire)}</td>
-        <td>${item.quantityOut}</td>
       `;
       basketPlanTbody.appendChild(row);
     });
@@ -554,11 +613,7 @@ function renderBasketPlan(plan) {
   }
 
   basketHint.classList.add("hidden");
-  showMessage(
-    basketResult,
-    `Lista para montagem: ${plan.summary?.totalLines || rows.length} item(ns) com ID da etiqueta. Ordem = validade mais próxima primeiro (FEFO).`,
-    false
-  );
+  basketResult.classList.add("hidden");
   basketCheckoutBtn.disabled = false;
 }
 
@@ -702,6 +757,9 @@ foodForm.addEventListener("submit", async (event) => {
     });
     foodForm.reset();
     showMessage(foodResult, `Alimento salvo. ID para etiqueta: ${created.id}`);
+    if (currentUser?.role === "admin") {
+      await loadAdminData();
+    }
   } catch (error) {
     showMessage(foodResult, error.message, true);
   }
@@ -738,6 +796,9 @@ outputForm.addEventListener("submit", async (event) => {
       outputResult,
       `Saída registrada. ID: ${output.foodId} | Estoque restante: ${output.quantityRemaining}`
     );
+    if (currentUser?.role === "admin") {
+      await loadAdminData();
+    }
   } catch (error) {
     showMessage(outputResult, error.message, true);
   }

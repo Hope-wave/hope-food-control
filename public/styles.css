@@ -536,6 +536,81 @@ body.auth-mode .container {
   margin-top: 14px;
 }
 
+.dashboard-entry-category-card {
+  margin-top: 14px;
+}
+
+.category-pie-chart {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+
+.category-pie {
+  position: relative;
+  display: grid;
+  width: 172px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gray-200);
+}
+
+.category-pie::before {
+  position: absolute;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--white);
+  content: "";
+}
+
+.category-pie-total {
+  position: relative;
+  max-width: 90px;
+  color: var(--hope-navy);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.category-pie-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category-pie-legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--gray-700);
+  font-size: 13px;
+}
+
+.category-pie-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.category-pie-legend strong {
+  color: var(--hope-navy);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.category-pie-legend .category-pie-empty {
+  display: block;
+  color: var(--gray-500);
+}
+
 .dashboard-card-heading {
   display: flex;
   justify-content: space-between;
@@ -555,30 +630,6 @@ body.auth-mode .container {
   color: var(--gray-500);
   font-size: 12px;
   line-height: 1.4;
-}
-
-.stock-category-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.stock-category-item {
-  flex: 1 1 150px;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--gray-200);
-  border-radius: 10px;
-  background: var(--gray-100);
-  color: var(--gray-700);
-  font-size: 12px;
-}
-
-.stock-category-item strong {
-  color: var(--hope-accent);
-  white-space: nowrap;
 }
 
 .stock-food-list {
@@ -749,7 +800,7 @@ body.auth-mode .container {
 }
 
 .action-form button[type="submit"] {
-  margin-top: auto;
+  margin-top: 24px;
   padding-top: 12px;
   padding-bottom: 12px;
 }
@@ -1216,6 +1267,15 @@ td {
 
   .dashboard-card-heading {
     flex-direction: column;
+  }
+
+  .category-pie-chart {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .category-pie-legend {
+    width: 100%;
   }
 
   .chart-legend {

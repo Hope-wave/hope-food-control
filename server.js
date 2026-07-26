@@ -18,6 +18,7 @@ const {
   buildPickListForVolunteer,
   getFoodCategory
 } = require("./src/basket");
+const { summarizeEntryCategories } = require("./src/dashboard");
 
 const app = express();
 const { db, useFirestoreSessionStore } = initFirebase();
@@ -192,7 +193,7 @@ app.get("/api/me", (req, res) => {
   return res.json({ user: req.session.user });
 });
 
-app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
+app.post("/api/foods", requireRoles("volunteer", "admin"), async (req, res) => {
   try {
     const { name, weight, validityDate } = req.body;
 
@@ -263,7 +264,7 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
   }
 });
 
-app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
+app.post("/api/foods/output", requireRoles("volunteer", "admin"), async (req, res) => {
   try {
     const { id } = req.body;
 
@@ -412,6 +413,13 @@ app.get("/api/admin/dashboard", requireRole("admin"), async (req, res) => {
     });
 
     const entriesThisMonth = entriesByMonth.get(month.key) || 0;
+    const entryCategories = summarizeEntryCategories(
+      foods,
+      month.key,
+      monthKeyInDashboardTimeZone,
+      getFoodCategory,
+      quantityOf
+    );
     const individualOutputs = individualOutputsByMonth.get(month.key) || 0;
     const basketFoodOutputs = basketOutputsByMonth.get(month.key) || 0;
     const basketsThisMonth = basketsByMonth.get(month.key) || 0;
@@ -470,6 +478,7 @@ app.get("/api/admin/dashboard", requireRole("admin"), async (req, res) => {
       month,
       months: availableMonths.map(({ key, label }) => ({ key, label })),
       history,
+      entryCategories,
       stockByFood: [...stockByFood.values()].sort(sortByQuantity),
       stockByCategory: [...stockByCategory.values()].sort(
         (a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label)
