@@ -13,7 +13,12 @@ const {
   hasStock,
   createUniqueFoodId
 } = require("./src/inventory");
-const { planBasicBasket, buildPickListForVolunteer } = require("./src/basket");
+const {
+  planBasicBasket,
+  buildPickListForVolunteer,
+  getFoodCategory
+} = require("./src/basket");
+const { summarizeEntryCategories } = require("./src/dashboard");
 
 const app = express();
 const { db, useFirestoreSessionStore } = initFirebase();
@@ -34,6 +39,62 @@ function sessionCookieSecure() {
 }
 
 const port = Number(process.env.PORT) || 3000;
+const DASHBOARD_TIME_ZONE = "America/Sao_Paulo";
+
+function monthKeyInDashboardTimeZone(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DASHBOARD_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${values.year}-${values.month}`;
+}
+
+function isMonthKey(value) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ""));
+}
+
+function getDashboardMonth(requestedMonth) {
+  const currentKey = monthKeyInDashboardTimeZone(new Date());
+  const key = isMonthKey(requestedMonth) ? requestedMonth : currentKey;
+  const referenceDate = new Date(`${key}-01T12:00:00-03:00`);
+  return {
+    key,
+    label: new Intl.DateTimeFormat("pt-BR", {
+      timeZone: DASHBOARD_TIME_ZONE,
+      month: "long",
+      year: "numeric"
+    }).format(referenceDate),
+    shortLabel: new Intl.DateTimeFormat("pt-BR", {
+      timeZone: DASHBOARD_TIME_ZONE,
+      month: "short",
+      year: "2-digit"
+    })
+      .format(referenceDate)
+      .replace(".", "")
+  };
+}
+
+function quantityOf(value) {
+  const quantity = Number(value?.quantity ?? value);
+  return Number.isNaN(quantity) ? 0 : quantity;
+}
+
+function sumBasketLineQuantities(basket) {
+  return Array.isArray(basket?.lines)
+    ? basket.lines.reduce((total, line) => total + quantityOf(line.quantityOut), 0)
+    : 0;
+}
 
 function devCors(req, res, next) {
   if (process.env.NODE_ENV === "production") {
@@ -132,7 +193,7 @@ app.get("/api/me", (req, res) => {
   return res.json({ user: req.session.user });
 });
 
-app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
+app.post("/api/foods", requireRoles("volunteer", "admin"), async (req, res) => {
   try {
     const { name, weight, validityDate } = req.body;
 
@@ -170,6 +231,7 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
         id: shortId,
         name: nameTrimmed,
         quantity: 1,
+        quantityIn: 1,
         weight: parsedWeight,
         validityDate: validityTrimmed,
         available: true,
@@ -202,7 +264,7 @@ app.post("/api/foods", requireRole("volunteer"), async (req, res) => {
   }
 });
 
-app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
+app.post("/api/foods/output", requireRoles("volunteer", "admin"), async (req, res) => {
   try {
     const { id } = req.body;
 
@@ -234,11 +296,21 @@ app.post("/api/foods/output", requireRole("volunteer"), async (req, res) => {
     }
 
     const updatedQty = food.quantity - outputQty;
+    const createdAt = new Date().toISOString();
 
     await foodRef.update({
       quantity: updatedQty,
       available: updatedQty > 0,
-      updatedAt: new Date().toISOString()
+      updatedAt: createdAt
+    });
+
+    await db.collection("foodOutputs").add({
+      type: "saida_avulsa",
+      foodId: food.id,
+      foodName: food.name,
+      quantityOut: outputQty,
+      registeredBy: req.session.user.username,
+      createdAt
     });
 
     return res.json({
@@ -295,6 +367,142 @@ app.get("/api/admin/alerts", requireRole("admin"), async (req, res) => {
   }
 });
 
+app.get("/api/admin/dashboard", requireRole("admin"), async (req, res) => {
+  try {
+    const [foodsSnapshot, foodOutputsSnapshot, basketOutputsSnapshot] =
+      await Promise.all([
+        db.collection("foods").get(),
+        db.collection("foodOutputs").get(),
+        db.collection("basketOutputs").get()
+      ]);
+
+    const foods = foodsSnapshot.docs.map((doc) => doc.data());
+    const foodOutputs = foodOutputsSnapshot.docs.map((doc) => doc.data());
+    const basketOutputs = basketOutputsSnapshot.docs.map((doc) => doc.data());
+    const month = getDashboardMonth(req.query.month);
+    const currentMonth = getDashboardMonth();
+    const monthKeys = new Set([currentMonth.key]);
+    const entriesByMonth = new Map();
+    const individualOutputsByMonth = new Map();
+    const basketOutputsByMonth = new Map();
+    const basketsByMonth = new Map();
+    const addToMonth = (map, key, value) => {
+      if (!key) return;
+      monthKeys.add(key);
+      map.set(key, (map.get(key) || 0) + value);
+    };
+
+    foods.forEach((food) => {
+      addToMonth(
+        entriesByMonth,
+        monthKeyInDashboardTimeZone(food.createdAt),
+        quantityOf(food.quantityIn ?? food.quantity)
+      );
+    });
+    foodOutputs.forEach((output) => {
+      addToMonth(
+        individualOutputsByMonth,
+        monthKeyInDashboardTimeZone(output.createdAt),
+        quantityOf(output.quantityOut)
+      );
+    });
+    basketOutputs.forEach((basket) => {
+      const key = monthKeyInDashboardTimeZone(basket.createdAt);
+      addToMonth(basketsByMonth, key, 1);
+      addToMonth(basketOutputsByMonth, key, sumBasketLineQuantities(basket));
+    });
+
+    const entriesThisMonth = entriesByMonth.get(month.key) || 0;
+    const entryCategories = summarizeEntryCategories(
+      foods,
+      month.key,
+      monthKeyInDashboardTimeZone,
+      getFoodCategory,
+      quantityOf
+    );
+    const individualOutputs = individualOutputsByMonth.get(month.key) || 0;
+    const basketFoodOutputs = basketOutputsByMonth.get(month.key) || 0;
+    const basketsThisMonth = basketsByMonth.get(month.key) || 0;
+    const foodsInStock = foods.filter(hasStock);
+    const stockUnits = foodsInStock.reduce(
+      (total, food) => total + quantityOf(food),
+      0
+    );
+    const foodTypesInStock = new Set(
+      foodsInStock.map((food) => String(food.name || "").trim().toLowerCase())
+    ).size;
+    const expiringSoon = foodsInStock.filter((food) => {
+      const days = getDaysToExpire(food.validityDate);
+      return days !== null && days >= 0 && days <= 30;
+    }).length;
+    const expired = foodsInStock.filter(
+      (food) => getFoodStatus(food.validityDate) === "vencido"
+    ).length;
+    const stockByFood = new Map();
+    const stockByCategory = new Map();
+
+    foodsInStock.forEach((food) => {
+      const name = String(food.name || "Alimento sem nome").trim() || "Alimento sem nome";
+      const foodKey = name.toLocaleLowerCase("pt-BR");
+      const foodSummary = stockByFood.get(foodKey) || { name, quantity: 0 };
+      foodSummary.quantity += quantityOf(food);
+      stockByFood.set(foodKey, foodSummary);
+
+      const category = getFoodCategory(name);
+      const categorySummary = stockByCategory.get(category.key) || {
+        label: category.label,
+        quantity: 0
+      };
+      categorySummary.quantity += quantityOf(food);
+      stockByCategory.set(category.key, categorySummary);
+    });
+    const sortByQuantity = (a, b) =>
+      b.quantity - a.quantity || a.name.localeCompare(b.name, "pt-BR");
+    const availableMonths = [...monthKeys]
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => getDashboardMonth(key));
+    const history = [...monthKeys]
+      .sort((a, b) => a.localeCompare(b))
+      .slice(-12)
+      .map((key) => ({
+        key,
+        label: getDashboardMonth(key).shortLabel,
+        entries: entriesByMonth.get(key) || 0,
+        foodOutputs:
+          (individualOutputsByMonth.get(key) || 0) +
+          (basketOutputsByMonth.get(key) || 0),
+        baskets: basketsByMonth.get(key) || 0
+      }));
+
+    return res.json({
+      month,
+      months: availableMonths.map(({ key, label }) => ({ key, label })),
+      history,
+      entryCategories,
+      stockByFood: [...stockByFood.values()].sort(sortByQuantity),
+      stockByCategory: [...stockByCategory.values()].sort(
+        (a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label)
+      ),
+      metrics: {
+        entries: entriesThisMonth,
+        foodOutputs: individualOutputs + basketFoodOutputs,
+        baskets: basketsThisMonth,
+        stockUnits,
+        foodTypesInStock,
+        expiringSoon,
+        expired,
+        individualOutputs,
+        basketFoodOutputs,
+        averageItemsPerBasket: basketsThisMonth
+          ? Number((basketFoodOutputs / basketsThisMonth).toFixed(1))
+          : 0
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 app.get(
   "/api/baskets/basic/plan",
   requireRoles("volunteer", "admin"),
@@ -307,6 +515,7 @@ app.get(
 
       return res.json({
         canAssemble: plan.canAssemble,
+        hasAllBaseItems: plan.hasAllBaseItems,
         missingBase: plan.missingBase,
         pickList,
         baseItems: plan.baseItems.map((item) => ({
@@ -355,8 +564,7 @@ app.post(
 
       if (!plan.canAssemble) {
         return res.status(400).json({
-          message:
-            "Não é possível montar a cesta: faltam itens obrigatórios no estoque.",
+          message: "Não há alimentos disponíveis para registrar a saída da cesta.",
           missingBase: plan.missingBase
         });
       }
@@ -409,13 +617,15 @@ app.post(
         type: "cesta_basica",
         notes,
         lines,
+        missingBase: plan.missingBase,
         registeredBy: req.session.user.username,
         createdAt: new Date().toISOString()
       });
 
       return res.json({
         message: "Saída da cesta básica registrada com sucesso.",
-        lines
+        lines,
+        missingBase: plan.missingBase
       });
     } catch (error) {
       return res.status(500).json({ message: error.message });

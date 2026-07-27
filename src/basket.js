@@ -102,6 +102,22 @@ function matchesOptionalRule(rule, name) {
   return matchesAnyPhrase(name, rule.phrases);
 }
 
+function getFoodCategory(name) {
+  const baseRule = BASE_RULES.find((rule) => matchesBaseRule(rule, name));
+  if (baseRule) {
+    return { key: baseRule.key, label: baseRule.label };
+  }
+
+  const optionalRule = OPTIONAL_RULES.find((rule) =>
+    matchesOptionalRule(rule, name)
+  );
+  if (optionalRule) {
+    return { key: optionalRule.key, label: optionalRule.label };
+  }
+
+  return { key: "outros", label: "Outros alimentos" };
+}
+
 function sortByFefoThenId(a, b) {
   const ta = parseDateOnly(a.validityDate);
   const tb = parseDateOnly(b.validityDate);
@@ -182,10 +198,15 @@ function planBasicBasket(foods) {
   }
 
   const allocations = [...baseAllocations, ...optionalIncluded];
-  const canAssemble = missingBase.length === 0;
+  // A cesta pode sair com os itens que estiverem disponíveis. A ausência de
+  // itens-base é informativa, não bloqueia a entrega; só não há saída se não
+  // existir nenhum item para baixar.
+  const canAssemble = allocations.length > 0;
+  const hasAllBaseItems = missingBase.length === 0;
 
   return {
     canAssemble,
+    hasAllBaseItems,
     missingBase,
     baseItems: baseAllocations,
     optionalIncluded,
@@ -231,6 +252,7 @@ function buildPickListForVolunteer(plan, getDaysToExpire) {
 module.exports = {
   BASE_RULES,
   OPTIONAL_RULES,
+  getFoodCategory,
   planBasicBasket,
   buildPickListForVolunteer
 };
