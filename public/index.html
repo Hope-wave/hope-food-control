@@ -373,7 +373,7 @@
             <div class="table-header">
               <h3>Estoque completo</h3>
               <div class="table-actions">
-                <button id="export-pdf-btn" class="secondary" type="button">
+                <button id="export-pdf-btn" class="secondary" type="button" title="Exporta o estoque completo em PDF">
                   Exportar PDF
                 </button>
                 <button id="refresh-admin-btn" class="secondary">Atualizar</button>
@@ -416,6 +416,73 @@
             Confirmar
           </button>
         </form>
+      </div>
+    </dialog>
+
+    <dialog id="report-export-dialog" class="report-dialog" aria-labelledby="report-export-title">
+      <div class="report-dialog-content">
+        <h2 id="report-export-title">Exportar relatório por validade</h2>
+        <p class="report-dialog-subtitle">
+          Escolha o critério e confirme a faixa de datas para gerar o PDF.
+        </p>
+
+        <div class="report-option-group" role="radiogroup" aria-label="Tipo de filtro do relatório">
+          <label class="report-option">
+            <input type="radio" name="report-mode" value="days" checked />
+            <span>Por dias</span>
+          </label>
+          <label class="report-option">
+            <input type="radio" name="report-mode" value="months" />
+            <span>Por meses</span>
+          </label>
+        </div>
+
+        <div id="report-days-fields" class="report-fields">
+          <div class="report-field">
+            <label for="report-start-date">Data inicial</label>
+            <input id="report-start-date" type="date" />
+          </div>
+          <div class="report-field">
+            <label for="report-end-date">Data final</label>
+            <input id="report-end-date" type="date" />
+          </div>
+        </div>
+
+        <div id="report-months-fields" class="report-fields hidden">
+          <div class="report-field">
+            <label for="report-start-month">Mês inicial</label>
+            <select id="report-start-month"></select>
+          </div>
+          <div class="report-field">
+            <label for="report-end-month">Mês final</label>
+            <select id="report-end-month"></select>
+          </div>
+        </div>
+
+        <div class="report-preview-panel">
+          <div class="report-preview-header">
+            <strong>Pré-visualização</strong>
+            <span id="report-preview-count">0 itens</span>
+          </div>
+          <div class="table-wrapper report-preview-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nome</th>
+                  <th>Quantidade</th>
+                  <th>Validade</th>
+                </tr>
+              </thead>
+              <tbody id="report-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="report-actions">
+          <button type="button" class="secondary" id="report-cancel-btn">Cancelar</button>
+          <button type="button" id="report-generate-btn">Gerar PDF</button>
+        </div>
       </div>
     </dialog>
 

@@ -60,6 +60,18 @@ const confirmationTitle = document.getElementById("confirmation-title");
 const confirmationMessage = document.getElementById("confirmation-message");
 const confirmationDetails = document.getElementById("confirmation-details");
 const confirmationConfirmBtn = document.getElementById("confirmation-confirm-btn");
+const reportExportDialog = document.getElementById("report-export-dialog");
+const reportStartDate = document.getElementById("report-start-date");
+const reportEndDate = document.getElementById("report-end-date");
+const reportStartMonth = document.getElementById("report-start-month");
+const reportEndMonth = document.getElementById("report-end-month");
+const reportDaysFields = document.getElementById("report-days-fields");
+const reportMonthsFields = document.getElementById("report-months-fields");
+const reportPreviewTbody = document.getElementById("report-preview-tbody");
+const reportPreviewCount = document.getElementById("report-preview-count");
+const reportGenerateBtn = document.getElementById("report-generate-btn");
+const reportCancelBtn = document.getElementById("report-cancel-btn");
+const reportModeInputs = document.querySelectorAll('input[name="report-mode"]');
 
 const FOODS_PAGE_SIZE = 10;
 const ALERTS_PAGE_SIZE = 8;
@@ -262,6 +274,268 @@ function formatDateTimePtBr(dateValue) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(dateValue);
+}
+
+function formatMonthLabel(monthKey) {
+  if (!monthKey) {
+    return "";
+  }
+
+  const [year, month] = String(monthKey).split("-");
+  const monthNames = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ];
+
+  const monthIndex = Number(month || 0);
+  return `${monthNames[monthIndex - 1] || "Mês"} de ${year || ""}`;
+}
+
+function getMonthRangeEnd(monthKey) {
+  const [year, month] = String(monthKey || "").split("-");
+  if (!year || !month) {
+    return null;
+  }
+
+  const yearNumber = Number(year);
+  const monthNumber = Number(month);
+  if (!Number.isInteger(yearNumber) || !Number.isInteger(monthNumber)) {
+    return null;
+  }
+
+  const lastDay = new Date(yearNumber, monthNumber, 0).getDate();
+  return new Date(`${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59`);
+}
+
+function getValidFoodsForReport() {
+  return (allFoods || []).filter((food) => food && food.validityDate);
+}
+
+function getAvailableReportMonths() {
+  return [...new Set(getValidFoodsForReport().map((food) => String(food.validityDate).slice(0, 7)))].sort();
+}
+
+function buildReportRowsFromFoods(foods) {
+  return foods
+    .slice()
+    .sort((a, b) => String(a.validityDate).localeCompare(String(b.validityDate)))
+    .map((food) => [
+      sanitizePdfText(food.id, "—"),
+      sanitizePdfText(food.name, "Alimento sem nome"),
+      Number(food.quantity ?? 0),
+      sanitizePdfText(formatDatePtBr(food.validityDate), "—")
+    ]);
+}
+
+function getSelectedReportFoods() {
+  const validFoods = getValidFoodsForReport();
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+
+  if (!validFoods.length) {
+    return [];
+  }
+
+  if (mode === "months") {
+    const startMonth = reportStartMonth.value;
+    const endMonth = reportEndMonth.value || startMonth;
+    if (!startMonth || !endMonth) {
+      return [];
+    }
+
+    const start = new Date(`${startMonth}-01T00:00:00`);
+    const end = getMonthRangeEnd(endMonth);
+    if (!end) {
+      return [];
+    }
+
+    return validFoods.filter((food) => {
+      const date = new Date(`${food.validityDate}T00:00:00`);
+      return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+    });
+  }
+
+  const startDate = reportStartDate.value;
+  const endDate = reportEndDate.value;
+  if (!startDate || !endDate) {
+    return [];
+  }
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (start > end) {
+    return [];
+  }
+
+  return validFoods.filter((food) => {
+    const date = new Date(`${food.validityDate}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+  });
+}
+
+function renderReportPreview() {
+  const selectedFoods = getSelectedReportFoods();
+  reportPreviewTbody.innerHTML = "";
+  reportPreviewCount.textContent = `${selectedFoods.length} item${selectedFoods.length === 1 ? "" : "s"}`;
+
+  if (!selectedFoods.length) {
+    const emptyRow = document.createElement("tr");
+    emptyRow.innerHTML = '<td colspan="4">Nenhum alimento encontrado para o intervalo selecionado.</td>';
+    reportPreviewTbody.appendChild(emptyRow);
+    return;
+  }
+
+  buildReportRowsFromFoods(selectedFoods).forEach(([id, name, quantity, validity]) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${id}</td>
+      <td>${name}</td>
+      <td>${quantity}</td>
+      <td>${validity}</td>
+    `;
+    reportPreviewTbody.appendChild(row);
+  });
+}
+
+function populateReportFields() {
+  const months = getAvailableReportMonths();
+  if (!months.length) {
+    reportStartMonth.innerHTML = "<option value=''>Nenhum mês disponível</option>";
+    reportEndMonth.innerHTML = "<option value=''>Nenhum mês disponível</option>";
+    return;
+  }
+
+  const options = months
+    .map((month) => `<option value="${month}">${formatMonthLabel(month)}</option>`)
+    .join("");
+
+  reportStartMonth.innerHTML = options;
+  reportEndMonth.innerHTML = options;
+  reportStartMonth.value = months[0];
+  reportEndMonth.value = months[months.length - 1];
+}
+
+function updateReportModeFields() {
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+  const showDays = mode === "days";
+
+  reportDaysFields.classList.toggle("hidden", !showDays);
+  reportMonthsFields.classList.toggle("hidden", showDays);
+
+  [reportStartDate, reportEndDate].forEach((field) => {
+    if (!field) return;
+    field.disabled = !showDays;
+    field.setAttribute("aria-hidden", String(!showDays));
+  });
+
+  [reportStartMonth, reportEndMonth].forEach((field) => {
+    if (!field) return;
+    field.disabled = showDays;
+    field.setAttribute("aria-hidden", String(showDays));
+  });
+
+  renderReportPreview();
+}
+
+function openReportExportDialog() {
+  if (!allFoods.length) {
+    showMessage(outputResult, "Nao ha alimentos cadastrados para exportar PDF.", true);
+    return;
+  }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showMessage(outputResult, "Biblioteca de PDF nao carregada no navegador.", true);
+    return;
+  }
+
+  const validFoods = getValidFoodsForReport();
+  if (!validFoods.length) {
+    showMessage(outputResult, "Nenhum alimento possui data de validade cadastrada para gerar o relatório.", true);
+    return;
+  }
+
+  populateReportFields();
+  const defaultStart = validFoods
+    .map((food) => food.validityDate)
+    .sort()[0];
+  const defaultEnd = validFoods
+    .map((food) => food.validityDate)
+    .sort().at(-1);
+
+  reportStartDate.value = defaultStart || "";
+  reportEndDate.value = defaultEnd || "";
+  updateReportModeFields();
+  reportExportDialog.showModal();
+}
+
+function closeReportExportDialog() {
+  if (reportExportDialog.open) {
+    reportExportDialog.close();
+  }
+}
+
+function generateReportPdfFromSelection() {
+  const selectedFoods = getSelectedReportFoods();
+  if (!selectedFoods.length) {
+    showMessage(outputResult, "Nenhum alimento encontrado para o intervalo selecionado.", true);
+    return;
+  }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showMessage(outputResult, "Biblioteca de PDF nao carregada no navegador.", true);
+    return;
+  }
+
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+  const selectedRange = mode === "months"
+    ? `${formatMonthLabel(reportStartMonth.value)} até ${formatMonthLabel(reportEndMonth.value)}`
+    : `${formatDatePtBr(reportStartDate.value)} até ${formatDatePtBr(reportEndDate.value)}`;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const generatedAt = new Date();
+  const rows = buildReportRowsFromFoods(selectedFoods);
+
+  doc.setFillColor(99, 52, 218);
+  doc.roundedRect(30, 18, 530, 34, 8, 8, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.text("Base Hope - Relatório por validade", 42, 39);
+  doc.setFontSize(9);
+  doc.text(`Período: ${selectedRange}`, 42, 50);
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${formatDateTimePtBr(generatedAt)}`, 42, 68);
+
+  doc.autoTable({
+    startY: 82,
+    head: [["ID", "Nome", "Quantidade", "Validade"]],
+    body: rows,
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [99, 52, 218] }
+  });
+
+  const stamp = generatedAt.toISOString().slice(0, 10);
+  doc.save(`relatorio-validade-${stamp}.pdf`);
+  closeReportExportDialog();
+}
+
+function sanitizePdfText(value, fallback = "—") {
+  const normalized = String(value ?? "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized || fallback;
 }
 
 function updateExportButtonState() {
@@ -657,17 +931,17 @@ function exportFoodsPdf() {
   const generatedAt = new Date();
 
   doc.setFontSize(14);
-  doc.text("Base Hope - Estoque completo", 40, 38);
+  doc.text(sanitizePdfText("Base Hope - Estoque completo"), 40, 38);
   doc.setFontSize(10);
-  doc.text(`Gerado em: ${formatDateTimePtBr(generatedAt)}`, 40, 56);
+  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 40, 56);
 
   const tableRows = allFoods.map((food) => [
-    food.id,
-    food.name,
-    String(food.quantity),
+    sanitizePdfText(food.id, "—"),
+    sanitizePdfText(food.name, "Alimento sem nome"),
+    String(food.quantity ?? 0),
     food.weight != null && food.weight !== "" ? String(food.weight) : "-",
-    formatDatePtBr(food.validityDate),
-    statusLabel(food.status)
+    sanitizePdfText(formatDatePtBr(food.validityDate), "—"),
+    sanitizePdfText(statusLabel(food.status), "Normal")
   ]);
 
   doc.autoTable({
@@ -822,7 +1096,25 @@ dashboardMonthSelect.addEventListener("change", async () => {
 });
 
 if (exportPdfBtn) {
-  exportPdfBtn.addEventListener("click", exportFoodsPdf);
+  exportPdfBtn.addEventListener("click", openReportExportDialog);
+}
+
+reportModeInputs.forEach((input) => {
+  input.addEventListener("change", updateReportModeFields);
+});
+
+[reportStartDate, reportEndDate, reportStartMonth, reportEndMonth].forEach((el) => {
+  if (el) {
+    el.addEventListener("change", renderReportPreview);
+  }
+});
+
+if (reportGenerateBtn) {
+  reportGenerateBtn.addEventListener("click", generateReportPdfFromSelection);
+}
+
+if (reportCancelBtn) {
+  reportCancelBtn.addEventListener("click", closeReportExportDialog);
 }
 
 foodsPrevBtn.addEventListener("click", () => {
