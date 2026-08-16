@@ -738,14 +738,14 @@ foodForm.addEventListener("submit", async (event) => {
     }
 
     const confirmed = await requestConfirmation({
-      title: "Confirmar cadastro de alimento",
-      message: "Revise os dados antes de salvar no estoque.",
+      title: "Confirmar registro",
+      message: "Você confirma o registro deste alimento?",
       details: [
         ["Alimento", body.name],
         ["Peso", body.weight != null ? `${body.weight} kg` : "Não informado"],
         ["Validade", formatDatePtBr(body.validityDate)]
       ],
-      confirmLabel: "Confirmar cadastro"
+      confirmLabel: "Sim"
     });
     if (!confirmed) {
       return;
@@ -772,13 +772,13 @@ outputForm.addEventListener("submit", async (event) => {
   try {
     const foodId = String(formData.get("id")).toUpperCase().trim();
     const confirmed = await requestConfirmation({
-      title: "Confirmar baixa de alimento",
-      message: "Esta operação reduzirá uma unidade do estoque.",
+      title: "Confirmar saída",
+      message: "Deseja realmente registrar a saída deste alimento?",
       details: [
         ["ID da etiqueta", foodId],
         ["Quantidade de saída", "1 unidade"]
       ],
-      confirmLabel: "Confirmar baixa"
+      confirmLabel: "Sim"
     });
     if (!confirmed) {
       return;
