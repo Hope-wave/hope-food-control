@@ -474,6 +474,9 @@ function openReportExportDialog() {
   reportStartDate.value = defaultStart || "";
   reportEndDate.value = defaultEnd || "";
   updateReportModeFields();
+
+  document.body.style.overflow = "auto";
+  document.documentElement.style.overflow = "auto";
   reportExportDialog.showModal();
 }
 
@@ -481,9 +484,92 @@ function closeReportExportDialog() {
   if (reportExportDialog.open) {
     reportExportDialog.close();
   }
+
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
 }
 
-function generateReportPdfFromSelection() {
+function loadPdfWatermarkImage() {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = "/Igrejaonda.png";
+  });
+}
+
+function drawPdfWatermark(doc, image) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const watermarkWidth = 170;
+  const watermarkHeight = 170;
+  const x = (pageWidth - watermarkWidth) / 2;
+  const y = (pageHeight - watermarkHeight) / 2;
+
+  if (image) {
+    if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+    }
+    doc.addImage(image, "PNG", x, y, watermarkWidth, watermarkHeight);
+    if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    }
+    return;
+  }
+
+  doc.setTextColor(232, 235, 250);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(42);
+  doc.text("hope", pageWidth / 2, pageHeight / 2 - 4, { align: "center", angle: -24 });
+  doc.setFontSize(21);
+  doc.text("Alimentos", pageWidth / 2, pageHeight / 2 + 20, { align: "center", angle: -24 });
+}
+
+function drawPdfFooter(doc) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(225, 229, 241);
+  doc.setLineWidth(0.6);
+  doc.line(30, pageHeight - 32, pageWidth - 30, pageHeight - 32);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(112, 120, 142);
+  doc.text("Base Hope | Controle de Alimentos", 30, pageHeight - 18);
+  doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageWidth - 30, pageHeight - 18, {
+    align: "right"
+  });
+}
+
+function stylePdfTable(doc, options, watermarkImage) {
+  doc.autoTable({
+    ...options,
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      textColor: [45, 52, 72],
+      lineColor: [225, 229, 241],
+      lineWidth: 0.5,
+      cellPadding: 7,
+      valign: "middle",
+      ...options.styles
+    },
+    headStyles: {
+      fillColor: [25, 43, 112],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      lineColor: [25, 43, 112],
+      ...options.headStyles
+    },
+    alternateRowStyles: { fillColor: [247, 249, 253] },
+    didDrawPage: () => {
+      drawPdfWatermark(doc, watermarkImage);
+      drawPdfFooter(doc);
+    }
+  });
+}
+
+async function generateReportPdfFromSelection() {
   const selectedFoods = getSelectedReportFoods();
   if (!selectedFoods.length) {
     showMessage(outputResult, "Nenhum alimento encontrado para o intervalo selecionado.", true);
@@ -504,25 +590,33 @@ function generateReportPdfFromSelection() {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const generatedAt = new Date();
   const rows = buildReportRowsFromFoods(selectedFoods);
+  const watermarkImage = await loadPdfWatermarkImage();
 
-  doc.setFillColor(99, 52, 218);
-  doc.roundedRect(30, 18, 530, 34, 8, 8, "F");
+  drawPdfWatermark(doc, watermarkImage);
+  doc.setFillColor(25, 43, 112);
+  doc.roundedRect(30, 18, 782, 42, 7, 7, "F");
   doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Base Hope - Relatório por validade", 42, 39);
+  doc.text(sanitizePdfText("Base Hope - Relatório por validade"), 44, 39);
   doc.setFontSize(9);
-  doc.text(`Período: ${selectedRange}`, 42, 50);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Período: ${sanitizePdfText(selectedRange)}`, 44, 53);
   doc.setTextColor(40, 40, 40);
   doc.setFontSize(10);
-  doc.text(`Gerado em: ${formatDateTimePtBr(generatedAt)}`, 42, 68);
+  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 30, 78);
 
-  doc.autoTable({
-    startY: 82,
+  stylePdfTable(doc, {
+    startY: 92,
     head: [["ID", "Nome", "Quantidade", "Validade"]],
     body: rows,
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [99, 52, 218] }
-  });
+    columnStyles: {
+      0: { cellWidth: 85, fontStyle: "bold", textColor: [38, 67, 177] },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 105, halign: "center" },
+      3: { cellWidth: 120, halign: "center" }
+    }
+  }, watermarkImage);
 
   const stamp = generatedAt.toISOString().slice(0, 10);
   doc.save(`relatorio-validade-${stamp}.pdf`);
@@ -573,7 +667,7 @@ function renderFoods(foods) {
   updateExportButtonState();
 
   if (!foods.length) {
-    foodsTbody.innerHTML = `<tr><td colspan="6">Nenhum alimento com estoque no momento.</td></tr>`;
+    foodsTbody.innerHTML = `<tr><td colspan="7">Nenhum alimento com estoque no momento.</td></tr>`;
     foodsPagination.classList.add("hidden");
     return;
   }
@@ -584,13 +678,25 @@ function renderFoods(foods) {
   pageFoods.forEach((food) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${food.id}</td>
-      <td>${food.name}</td>
-      <td>${food.quantity}</td>
-      <td>${food.weight != null && food.weight !== "" ? food.weight : "—"}</td>
-      <td>${formatDatePtBr(food.validityDate)}</td>
-      <td><span class="status ${food.status}">${statusLabel(food.status)}</span></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td><span class="status"></span></td>
+      <td><button type="button" class="secondary food-delete-btn">🗑</button></td>
     `;
+    row.cells[0].textContent = food.id;
+    row.cells[1].textContent = food.name;
+    row.cells[2].textContent = food.quantity;
+    row.cells[3].textContent = food.weight != null && food.weight !== "" ? food.weight : "—";
+    row.cells[4].textContent = formatDatePtBr(food.validityDate);
+    const status = row.querySelector(".status");
+    status.classList.add(food.status);
+    status.textContent = statusLabel(food.status);
+    const deleteButton = row.querySelector(".food-delete-btn");
+    deleteButton.setAttribute("aria-label", `Excluir ${String(food.name)}`);
+    deleteButton.addEventListener("click", () => deleteFood(food));
     foodsTbody.appendChild(row);
   });
 
@@ -603,6 +709,31 @@ function renderFoods(foods) {
     nextBtn: foodsNextBtn,
     infoEl: foodsPageInfo
   });
+}
+
+async function deleteFood(food) {
+  const confirmed = await requestConfirmation({
+    title: "Excluir alimento",
+    message: "Este alimento será removido definitivamente do estoque e da base de alimentos.",
+    details: [
+      ["ID da etiqueta", String(food.id)],
+      ["Alimento", String(food.name)]
+    ],
+    confirmLabel: "Excluir"
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/api/foods/${encodeURIComponent(String(food.id))}`, {
+      method: "DELETE"
+    });
+    showMessage(outputResult, `Alimento ${food.id} excluído do estoque e da base de alimentos.`);
+    await loadAdminData();
+  } catch (error) {
+    showMessage(outputResult, error.message, true);
+  }
 }
 
 function renderAlerts(alerts) {
@@ -836,10 +967,16 @@ function renderBasketPlan(plan) {
       row.innerHTML = `
         <td>${orderCell}</td>
         <td><span class="basket-pill ${isBase ? "base" : "extra"}">${isBase ? "Base" : "Adicional"}</span></td>
-        <td><span class="basket-food-id">${item.foodId}</span></td>
-        <td>${item.foodName}</td>
+        <td><span class="basket-food-id"></span></td>
+        <td></td>
         <td>${formatDatePtBr(item.validityDate)}</td>
+        <td><button type="button" class="secondary basket-remove-btn">Remover</button></td>
       `;
+      row.querySelector(".basket-food-id").textContent = item.foodId;
+      row.cells[3].textContent = item.foodName;
+      const removeButton = row.querySelector(".basket-remove-btn");
+      removeButton.setAttribute("aria-label", `Remover ${item.foodName} da cesta`);
+      removeButton.addEventListener("click", () => removeBasketItem(item.foodId));
       basketPlanTbody.appendChild(row);
     });
   }
@@ -915,7 +1052,83 @@ async function loadAdminData() {
   }
 }
 
-function exportFoodsPdf() {
+async function removeBasketItem(foodId) {
+  if (!lastBasketPlan) {
+    return;
+  }
+
+  const id = String(foodId);
+  const baseItem = (lastBasketPlan.baseItems || []).find(
+    (item) => String(item.foodId) === id
+  );
+  const itemExists = baseItem || (lastBasketPlan.optionalIncluded || []).some(
+    (item) => String(item.foodId) === id
+  );
+  if (!itemExists) {
+    return;
+  }
+
+  const confirmed = await requestConfirmation({
+    title: "Excluir alimento da cesta",
+    message: "Este alimento será removido definitivamente do estoque e da base de alimentos.",
+    details: [
+      ["ID da etiqueta", id],
+      ["Alimento", String((baseItem || (lastBasketPlan.optionalIncluded || []).find(
+        (item) => String(item.foodId) === id
+      ))?.foodName || "Alimento")]
+    ],
+    confirmLabel: "Excluir"
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  const removeButton = [...basketPlanTbody.querySelectorAll(".basket-remove-btn")]
+    .find((button) => button.parentElement?.parentElement?.cells[2]?.textContent.trim() === id);
+  if (removeButton) {
+    removeButton.disabled = true;
+  }
+
+  try {
+    await api(`/api/foods/${encodeURIComponent(id)}`, { method: "DELETE" });
+  } catch (error) {
+    if (removeButton) {
+      removeButton.disabled = false;
+    }
+    showMessage(basketResult, error.message, true);
+    return;
+  }
+
+  lastBasketPlan.baseItems = (lastBasketPlan.baseItems || []).filter(
+    (item) => String(item.foodId) !== id
+  );
+  lastBasketPlan.optionalIncluded = (lastBasketPlan.optionalIncluded || []).filter(
+    (item) => String(item.foodId) !== id
+  );
+  lastBasketPlan.pickList = (lastBasketPlan.pickList || []).filter(
+    (item) => String(item.foodId) !== id
+  );
+  lastBasketPlan.excludedFoodIds = [
+    ...(lastBasketPlan.excludedFoodIds || []),
+    id
+  ];
+  if (baseItem && !(lastBasketPlan.missingBase || []).some((item) => item.key === baseItem.categoryKey)) {
+    lastBasketPlan.missingBase = [
+      ...(lastBasketPlan.missingBase || []),
+      { key: baseItem.categoryKey, label: baseItem.categoryLabel }
+    ];
+  }
+  lastBasketPlan.summary = {
+    ...(lastBasketPlan.summary || {}),
+    baseCount: lastBasketPlan.baseItems.length,
+    optionalCount: lastBasketPlan.optionalIncluded.length,
+    totalLines: lastBasketPlan.baseItems.length + lastBasketPlan.optionalIncluded.length
+  };
+  lastBasketPlan.canAssemble = lastBasketPlan.summary.totalLines > 0;
+  renderBasketPlan(lastBasketPlan);
+}
+
+async function exportFoodsPdf() {
   if (!allFoods.length) {
     showMessage(outputResult, "Nao ha itens no estoque para exportar.", true);
     return;
@@ -929,11 +1142,18 @@ function exportFoodsPdf() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const generatedAt = new Date();
+  const watermarkImage = await loadPdfWatermarkImage();
 
-  doc.setFontSize(14);
-  doc.text(sanitizePdfText("Base Hope - Estoque completo"), 40, 38);
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 40, 56);
+  drawPdfWatermark(doc, watermarkImage);
+  doc.setFillColor(25, 43, 112);
+  doc.roundedRect(30, 18, 782, 42, 7, 7, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(sanitizePdfText("Base Hope - Estoque completo"), 44, 42);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 44, 54);
 
   const tableRows = allFoods.map((food) => [
     sanitizePdfText(food.id, "—"),
@@ -944,13 +1164,19 @@ function exportFoodsPdf() {
     sanitizePdfText(statusLabel(food.status), "Normal")
   ]);
 
-  doc.autoTable({
-    startY: 72,
+  stylePdfTable(doc, {
+    startY: 76,
     head: [["ID", "Nome", "Quantidade", "Peso (kg)", "Validade", "Status"]],
     body: tableRows,
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [99, 52, 218] }
-  });
+    columnStyles: {
+      0: { cellWidth: 70, fontStyle: "bold", textColor: [38, 67, 177] },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 85, halign: "center" },
+      3: { cellWidth: 85, halign: "center" },
+      4: { cellWidth: 115, halign: "center" },
+      5: { cellWidth: 135 }
+    }
+  }, watermarkImage);
 
   const stamp = generatedAt.toISOString().slice(0, 10);
   doc.save(`estoque-completo-${stamp}.pdf`);
@@ -1179,7 +1405,10 @@ basketCheckoutBtn.addEventListener("click", async () => {
 
     const output = await api("/api/baskets/basic/checkout", {
       method: "POST",
-      body: { notes: basketNotes.value }
+      body: {
+        notes: basketNotes.value,
+        excludedFoodIds: lastBasketPlan.excludedFoodIds || []
+      }
     });
     basketNotes.value = "";
     lastBasketPlan = null;

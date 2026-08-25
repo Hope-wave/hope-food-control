@@ -1023,11 +1023,17 @@ button:disabled {
 
 .report-dialog {
   width: min(100% - 30px, 780px);
+  max-height: min(90vh, 820px);
   padding: 0;
   border: 0;
   border-radius: 22px;
   box-shadow: 0 28px 80px rgba(8, 18, 64, 0.32);
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+body:has(dialog[open]) {
+  overflow: auto;
 }
 
 .report-dialog::backdrop {
@@ -1038,6 +1044,7 @@ button:disabled {
 .report-dialog-content {
   padding: 28px 28px 22px;
   background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
+  min-height: 100%;
 }
 
 .report-dialog h2 {
@@ -1074,6 +1081,12 @@ button:disabled {
   transition: all 0.2s ease;
 }
 
+.report-option:has(input:checked) {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(124, 58, 237, 0.12));
+  border-color: rgba(79, 70, 229, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.14);
+}
+
 .report-option:hover {
   border-color: rgba(26, 55, 230, 0.2);
   background: rgba(26, 55, 230, 0.05);
@@ -1084,6 +1097,11 @@ button:disabled {
   width: 16px;
   height: 16px;
   margin: 0;
+}
+
+.report-option span {
+  display: inline-flex;
+  align-items: center;
 }
 
 .report-fields {
@@ -1159,14 +1177,39 @@ button:disabled {
 }
 
 .report-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+  padding-top: 12px;
+  background: linear-gradient(180deg, rgba(248, 249, 255, 0) 0%, rgba(248, 249, 255, 0.9) 28%, rgba(248, 249, 255, 1) 100%);
 }
 
 .report-actions button {
   margin-top: 0;
+}
+
+#report-generate-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  box-shadow: 0 12px 22px rgba(79, 70, 229, 0.28);
+}
+
+#report-generate-btn:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+}
+
+#report-cancel-btn {
+  background: var(--gray-100);
+  color: var(--hope-navy);
+  border: 1px solid var(--gray-300);
+  box-shadow: none;
+}
+
+#report-cancel-btn:hover {
+  background: var(--gray-200);
 }
 
 .hint {
@@ -1343,6 +1386,21 @@ td {
   background: var(--hope-accent-soft);
   padding: 2px 8px;
   border-radius: 8px;
+}
+
+.basket-remove-btn {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.food-delete-btn {
+  margin: 0;
+  min-width: 36px;
+  padding: 7px 9px;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .basket-skipped {

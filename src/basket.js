@@ -147,11 +147,18 @@ function pickOneUnitFromCandidates(candidates, workingQtyById) {
   };
 }
 
-function planBasicBasket(foods) {
-  const list = foods.filter(hasStock).map((f) => ({
+function planBasicBasket(foods, excludedFoodIds = []) {
+  const excludedIds = new Set(
+    Array.isArray(excludedFoodIds)
+      ? excludedFoodIds.map((id) => String(id).trim()).filter(Boolean)
+      : []
+  );
+  const list = foods
+    .filter((food) => !excludedIds.has(String(food.id)) && hasStock(food))
+    .map((f) => ({
     ...f,
     quantity: Number(f.quantity)
-  }));
+    }));
 
   const workingQtyById = new Map(list.map((f) => [f.id, f.quantity]));
 

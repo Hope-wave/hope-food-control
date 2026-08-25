@@ -120,7 +120,7 @@ function devCors(req, res, next) {
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
   if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     return res.status(204).end();
   }
@@ -318,6 +318,26 @@ app.post("/api/foods/output", requireRoles("volunteer", "admin"), async (req, re
       foodId: food.id,
       quantityRemaining: updatedQty
     });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.delete("/api/foods/:id", requireRoles("volunteer", "admin"), async (req, res) => {
+  try {
+    const foodId = String(req.params.id || "").trim().toUpperCase();
+    if (!/^[A-Z0-9-]{2,32}$/.test(foodId)) {
+      return res.status(400).json({ message: "ID do alimento inválido." });
+    }
+
+    const foodRef = db.collection("foods").doc(foodId);
+    const snapshot = await foodRef.get();
+    if (!snapshot.exists) {
+      return res.status(404).json({ message: "Alimento não encontrado." });
+    }
+
+    await foodRef.delete();
+    return res.json({ message: "Alimento excluído do estoque e da base de alimentos.", foodId });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -557,10 +577,16 @@ app.post(
       const notes = req.body?.notes
         ? String(req.body.notes).trim().slice(0, 500)
         : "";
+      const excludedFoodIds = Array.isArray(req.body?.excludedFoodIds)
+        ? req.body.excludedFoodIds
+            .map((id) => String(id).trim())
+            .filter(Boolean)
+            .slice(0, 100)
+        : [];
 
       const snapshot = await db.collection("foods").get();
       const foods = snapshot.docs.map((doc) => doc.data());
-      const plan = planBasicBasket(foods);
+      const plan = planBasicBasket(foods, excludedFoodIds);
 
       if (!plan.canAssemble) {
         return res.status(400).json({
