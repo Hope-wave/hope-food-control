@@ -68,6 +68,26 @@ test("bloqueia a saída da cesta quando não há nenhum alimento disponível", (
   assert.equal(plan.missingBase.length, 7);
 });
 
+test("remove alimentos selecionados sem alterar o estoque original", () => {
+  const foods = [
+    food("AR-1", "Arroz", "2026-08-10"),
+    food("FE-1", "Feijão", "2026-08-11")
+  ];
+
+  const plan = planBasicBasket(foods, ["AR-1"]);
+
+  assert.deepEqual(plan.allocations.map((item) => item.foodId), ["FE-1"]);
+  assert.deepEqual(plan.missingBase.map((item) => item.key), [
+    "arroz",
+    "acucar",
+    "sal",
+    "oleo",
+    "macarrao",
+    "molho"
+  ]);
+  assert.equal(foods[0].quantity, 1);
+});
+
 test("agrupa as categorias que entraram no mês pela quantidade originalmente recebida", () => {
   const categories = summarizeEntryCategories(
     [

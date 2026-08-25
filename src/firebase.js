@@ -61,6 +61,9 @@ function createInMemoryDb() {
                 throw new Error("Documento nao encontrado para atualizar.");
               }
               collectionStore.set(key, { ...current, ...patch });
+            },
+            async delete() {
+              collectionStore.delete(key);
             }
           };
         },

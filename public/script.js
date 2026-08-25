@@ -60,6 +60,18 @@ const confirmationTitle = document.getElementById("confirmation-title");
 const confirmationMessage = document.getElementById("confirmation-message");
 const confirmationDetails = document.getElementById("confirmation-details");
 const confirmationConfirmBtn = document.getElementById("confirmation-confirm-btn");
+const reportExportDialog = document.getElementById("report-export-dialog");
+const reportStartDate = document.getElementById("report-start-date");
+const reportEndDate = document.getElementById("report-end-date");
+const reportStartMonth = document.getElementById("report-start-month");
+const reportEndMonth = document.getElementById("report-end-month");
+const reportDaysFields = document.getElementById("report-days-fields");
+const reportMonthsFields = document.getElementById("report-months-fields");
+const reportPreviewTbody = document.getElementById("report-preview-tbody");
+const reportPreviewCount = document.getElementById("report-preview-count");
+const reportGenerateBtn = document.getElementById("report-generate-btn");
+const reportCancelBtn = document.getElementById("report-cancel-btn");
+const reportModeInputs = document.querySelectorAll('input[name="report-mode"]');
 
 const FOODS_PAGE_SIZE = 10;
 const ALERTS_PAGE_SIZE = 8;
@@ -264,6 +276,362 @@ function formatDateTimePtBr(dateValue) {
   }).format(dateValue);
 }
 
+function formatMonthLabel(monthKey) {
+  if (!monthKey) {
+    return "";
+  }
+
+  const [year, month] = String(monthKey).split("-");
+  const monthNames = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro"
+  ];
+
+  const monthIndex = Number(month || 0);
+  return `${monthNames[monthIndex - 1] || "Mês"} de ${year || ""}`;
+}
+
+function getMonthRangeEnd(monthKey) {
+  const [year, month] = String(monthKey || "").split("-");
+  if (!year || !month) {
+    return null;
+  }
+
+  const yearNumber = Number(year);
+  const monthNumber = Number(month);
+  if (!Number.isInteger(yearNumber) || !Number.isInteger(monthNumber)) {
+    return null;
+  }
+
+  const lastDay = new Date(yearNumber, monthNumber, 0).getDate();
+  return new Date(`${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59`);
+}
+
+function getValidFoodsForReport() {
+  return (allFoods || []).filter((food) => food && food.validityDate);
+}
+
+function getAvailableReportMonths() {
+  return [...new Set(getValidFoodsForReport().map((food) => String(food.validityDate).slice(0, 7)))].sort();
+}
+
+function buildReportRowsFromFoods(foods) {
+  return foods
+    .slice()
+    .sort((a, b) => String(a.validityDate).localeCompare(String(b.validityDate)))
+    .map((food) => [
+      sanitizePdfText(food.id, "—"),
+      sanitizePdfText(food.name, "Alimento sem nome"),
+      Number(food.quantity ?? 0),
+      sanitizePdfText(formatDatePtBr(food.validityDate), "—")
+    ]);
+}
+
+function getSelectedReportFoods() {
+  const validFoods = getValidFoodsForReport();
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+
+  if (!validFoods.length) {
+    return [];
+  }
+
+  if (mode === "months") {
+    const startMonth = reportStartMonth.value;
+    const endMonth = reportEndMonth.value || startMonth;
+    if (!startMonth || !endMonth) {
+      return [];
+    }
+
+    const start = new Date(`${startMonth}-01T00:00:00`);
+    const end = getMonthRangeEnd(endMonth);
+    if (!end) {
+      return [];
+    }
+
+    return validFoods.filter((food) => {
+      const date = new Date(`${food.validityDate}T00:00:00`);
+      return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+    });
+  }
+
+  const startDate = reportStartDate.value;
+  const endDate = reportEndDate.value;
+  if (!startDate || !endDate) {
+    return [];
+  }
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (start > end) {
+    return [];
+  }
+
+  return validFoods.filter((food) => {
+    const date = new Date(`${food.validityDate}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+  });
+}
+
+function renderReportPreview() {
+  const selectedFoods = getSelectedReportFoods();
+  reportPreviewTbody.innerHTML = "";
+  reportPreviewCount.textContent = `${selectedFoods.length} item${selectedFoods.length === 1 ? "" : "s"}`;
+
+  if (!selectedFoods.length) {
+    const emptyRow = document.createElement("tr");
+    emptyRow.innerHTML = '<td colspan="4">Nenhum alimento encontrado para o intervalo selecionado.</td>';
+    reportPreviewTbody.appendChild(emptyRow);
+    return;
+  }
+
+  buildReportRowsFromFoods(selectedFoods).forEach(([id, name, quantity, validity]) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${id}</td>
+      <td>${name}</td>
+      <td>${quantity}</td>
+      <td>${validity}</td>
+    `;
+    reportPreviewTbody.appendChild(row);
+  });
+}
+
+function populateReportFields() {
+  const months = getAvailableReportMonths();
+  if (!months.length) {
+    reportStartMonth.innerHTML = "<option value=''>Nenhum mês disponível</option>";
+    reportEndMonth.innerHTML = "<option value=''>Nenhum mês disponível</option>";
+    return;
+  }
+
+  const options = months
+    .map((month) => `<option value="${month}">${formatMonthLabel(month)}</option>`)
+    .join("");
+
+  reportStartMonth.innerHTML = options;
+  reportEndMonth.innerHTML = options;
+  reportStartMonth.value = months[0];
+  reportEndMonth.value = months[months.length - 1];
+}
+
+function updateReportModeFields() {
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+  const showDays = mode === "days";
+
+  reportDaysFields.classList.toggle("hidden", !showDays);
+  reportMonthsFields.classList.toggle("hidden", showDays);
+
+  [reportStartDate, reportEndDate].forEach((field) => {
+    if (!field) return;
+    field.disabled = !showDays;
+    field.setAttribute("aria-hidden", String(!showDays));
+  });
+
+  [reportStartMonth, reportEndMonth].forEach((field) => {
+    if (!field) return;
+    field.disabled = showDays;
+    field.setAttribute("aria-hidden", String(showDays));
+  });
+
+  renderReportPreview();
+}
+
+function openReportExportDialog() {
+  if (!allFoods.length) {
+    showMessage(outputResult, "Nao ha alimentos cadastrados para exportar PDF.", true);
+    return;
+  }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showMessage(outputResult, "Biblioteca de PDF nao carregada no navegador.", true);
+    return;
+  }
+
+  const validFoods = getValidFoodsForReport();
+  if (!validFoods.length) {
+    showMessage(outputResult, "Nenhum alimento possui data de validade cadastrada para gerar o relatório.", true);
+    return;
+  }
+
+  populateReportFields();
+  const defaultStart = validFoods
+    .map((food) => food.validityDate)
+    .sort()[0];
+  const defaultEnd = validFoods
+    .map((food) => food.validityDate)
+    .sort().at(-1);
+
+  reportStartDate.value = defaultStart || "";
+  reportEndDate.value = defaultEnd || "";
+  updateReportModeFields();
+
+  document.body.style.overflow = "auto";
+  document.documentElement.style.overflow = "auto";
+  reportExportDialog.showModal();
+}
+
+function closeReportExportDialog() {
+  if (reportExportDialog.open) {
+    reportExportDialog.close();
+  }
+
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+}
+
+function loadPdfWatermarkImage() {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = "/Igrejaonda.png";
+  });
+}
+
+function drawPdfWatermark(doc, image) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const watermarkWidth = 170;
+  const watermarkHeight = 170;
+  const x = (pageWidth - watermarkWidth) / 2;
+  const y = (pageHeight - watermarkHeight) / 2;
+
+  if (image) {
+    if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+    }
+    doc.addImage(image, "PNG", x, y, watermarkWidth, watermarkHeight);
+    if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    }
+    return;
+  }
+
+  doc.setTextColor(232, 235, 250);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(42);
+  doc.text("hope", pageWidth / 2, pageHeight / 2 - 4, { align: "center", angle: -24 });
+  doc.setFontSize(21);
+  doc.text("Alimentos", pageWidth / 2, pageHeight / 2 + 20, { align: "center", angle: -24 });
+}
+
+function drawPdfFooter(doc) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(225, 229, 241);
+  doc.setLineWidth(0.6);
+  doc.line(30, pageHeight - 32, pageWidth - 30, pageHeight - 32);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(112, 120, 142);
+  doc.text("Base Hope | Controle de Alimentos", 30, pageHeight - 18);
+  doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageWidth - 30, pageHeight - 18, {
+    align: "right"
+  });
+}
+
+function stylePdfTable(doc, options, watermarkImage) {
+  doc.autoTable({
+    ...options,
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      textColor: [45, 52, 72],
+      lineColor: [225, 229, 241],
+      lineWidth: 0.5,
+      cellPadding: 7,
+      valign: "middle",
+      ...options.styles
+    },
+    headStyles: {
+      fillColor: [25, 43, 112],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      lineColor: [25, 43, 112],
+      ...options.headStyles
+    },
+    alternateRowStyles: { fillColor: [247, 249, 253] },
+    didDrawPage: () => {
+      drawPdfWatermark(doc, watermarkImage);
+      drawPdfFooter(doc);
+    }
+  });
+}
+
+async function generateReportPdfFromSelection() {
+  const selectedFoods = getSelectedReportFoods();
+  if (!selectedFoods.length) {
+    showMessage(outputResult, "Nenhum alimento encontrado para o intervalo selecionado.", true);
+    return;
+  }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showMessage(outputResult, "Biblioteca de PDF nao carregada no navegador.", true);
+    return;
+  }
+
+  const mode = document.querySelector('input[name="report-mode"]:checked')?.value || "days";
+  const selectedRange = mode === "months"
+    ? `${formatMonthLabel(reportStartMonth.value)} até ${formatMonthLabel(reportEndMonth.value)}`
+    : `${formatDatePtBr(reportStartDate.value)} até ${formatDatePtBr(reportEndDate.value)}`;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const generatedAt = new Date();
+  const rows = buildReportRowsFromFoods(selectedFoods);
+  const watermarkImage = await loadPdfWatermarkImage();
+
+  drawPdfWatermark(doc, watermarkImage);
+  doc.setFillColor(25, 43, 112);
+  doc.roundedRect(30, 18, 782, 42, 7, 7, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(sanitizePdfText("Base Hope - Relatório por validade"), 44, 39);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Período: ${sanitizePdfText(selectedRange)}`, 44, 53);
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 30, 78);
+
+  stylePdfTable(doc, {
+    startY: 92,
+    head: [["ID", "Nome", "Quantidade", "Validade"]],
+    body: rows,
+    columnStyles: {
+      0: { cellWidth: 85, fontStyle: "bold", textColor: [38, 67, 177] },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 105, halign: "center" },
+      3: { cellWidth: 120, halign: "center" }
+    }
+  }, watermarkImage);
+
+  const stamp = generatedAt.toISOString().slice(0, 10);
+  doc.save(`relatorio-validade-${stamp}.pdf`);
+  closeReportExportDialog();
+}
+
+function sanitizePdfText(value, fallback = "—") {
+  const normalized = String(value ?? "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized || fallback;
+}
+
 function updateExportButtonState() {
   if (!exportPdfBtn) {
     return;
@@ -299,7 +667,7 @@ function renderFoods(foods) {
   updateExportButtonState();
 
   if (!foods.length) {
-    foodsTbody.innerHTML = `<tr><td colspan="6">Nenhum alimento com estoque no momento.</td></tr>`;
+    foodsTbody.innerHTML = `<tr><td colspan="7">Nenhum alimento com estoque no momento.</td></tr>`;
     foodsPagination.classList.add("hidden");
     return;
   }
@@ -310,13 +678,25 @@ function renderFoods(foods) {
   pageFoods.forEach((food) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${food.id}</td>
-      <td>${food.name}</td>
-      <td>${food.quantity}</td>
-      <td>${food.weight != null && food.weight !== "" ? food.weight : "—"}</td>
-      <td>${formatDatePtBr(food.validityDate)}</td>
-      <td><span class="status ${food.status}">${statusLabel(food.status)}</span></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td><span class="status"></span></td>
+      <td><button type="button" class="secondary food-delete-btn">🗑</button></td>
     `;
+    row.cells[0].textContent = food.id;
+    row.cells[1].textContent = food.name;
+    row.cells[2].textContent = food.quantity;
+    row.cells[3].textContent = food.weight != null && food.weight !== "" ? food.weight : "—";
+    row.cells[4].textContent = formatDatePtBr(food.validityDate);
+    const status = row.querySelector(".status");
+    status.classList.add(food.status);
+    status.textContent = statusLabel(food.status);
+    const deleteButton = row.querySelector(".food-delete-btn");
+    deleteButton.setAttribute("aria-label", `Excluir ${String(food.name)}`);
+    deleteButton.addEventListener("click", () => deleteFood(food));
     foodsTbody.appendChild(row);
   });
 
@@ -329,6 +709,31 @@ function renderFoods(foods) {
     nextBtn: foodsNextBtn,
     infoEl: foodsPageInfo
   });
+}
+
+async function deleteFood(food) {
+  const confirmed = await requestConfirmation({
+    title: "Excluir alimento",
+    message: "Este alimento será removido definitivamente do estoque e da base de alimentos.",
+    details: [
+      ["ID da etiqueta", String(food.id)],
+      ["Alimento", String(food.name)]
+    ],
+    confirmLabel: "Excluir"
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/api/foods/${encodeURIComponent(String(food.id))}`, {
+      method: "DELETE"
+    });
+    showMessage(outputResult, `Alimento ${food.id} excluído do estoque e da base de alimentos.`);
+    await loadAdminData();
+  } catch (error) {
+    showMessage(outputResult, error.message, true);
+  }
 }
 
 function renderAlerts(alerts) {
@@ -562,10 +967,16 @@ function renderBasketPlan(plan) {
       row.innerHTML = `
         <td>${orderCell}</td>
         <td><span class="basket-pill ${isBase ? "base" : "extra"}">${isBase ? "Base" : "Adicional"}</span></td>
-        <td><span class="basket-food-id">${item.foodId}</span></td>
-        <td>${item.foodName}</td>
+        <td><span class="basket-food-id"></span></td>
+        <td></td>
         <td>${formatDatePtBr(item.validityDate)}</td>
+        <td><button type="button" class="secondary basket-remove-btn">Remover</button></td>
       `;
+      row.querySelector(".basket-food-id").textContent = item.foodId;
+      row.cells[3].textContent = item.foodName;
+      const removeButton = row.querySelector(".basket-remove-btn");
+      removeButton.setAttribute("aria-label", `Remover ${item.foodName} da cesta`);
+      removeButton.addEventListener("click", () => removeBasketItem(item.foodId));
       basketPlanTbody.appendChild(row);
     });
   }
@@ -641,7 +1052,89 @@ async function loadAdminData() {
   }
 }
 
-function exportFoodsPdf() {
+async function removeBasketItem(foodId) {
+  if (!lastBasketPlan) {
+    return;
+  }
+
+  const id = String(foodId);
+  const baseItem = (lastBasketPlan.baseItems || []).find(
+    (item) => String(item.foodId) === id
+  );
+  const optionalItem = (lastBasketPlan.optionalIncluded || []).find(
+    (item) => String(item.foodId) === id
+  );
+  const removedItem = baseItem || optionalItem;
+  if (!removedItem) {
+    return;
+  }
+
+  const confirmed = await requestConfirmation({
+    title: "Excluir alimento da cesta",
+    message: "Este alimento será removido definitivamente do estoque e da base de alimentos.",
+    details: [
+      ["ID da etiqueta", id],
+      ["Alimento", String(removedItem.foodName || "Alimento")]
+    ],
+    confirmLabel: "Excluir"
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  const removeButton = [...basketPlanTbody.querySelectorAll(".basket-remove-btn")]
+    .find((button) => button.parentElement?.parentElement?.cells[2]?.textContent.trim() === id);
+  if (removeButton) {
+    removeButton.disabled = true;
+  }
+
+  try {
+    await api(`/api/foods/${encodeURIComponent(id)}`, { method: "DELETE" });
+  } catch (error) {
+    if (removeButton) {
+      removeButton.disabled = false;
+    }
+    showMessage(basketResult, error.message, true);
+    return;
+  }
+
+  try {
+    const replacementPlan = await api("/api/baskets/basic/plan");
+    lastBasketPlan = replacementPlan;
+    renderBasketPlan(lastBasketPlan);
+
+    const replacement = [
+      ...(replacementPlan.baseItems || []),
+      ...(replacementPlan.optionalIncluded || [])
+    ].find((item) => item.categoryKey === removedItem.categoryKey);
+    if (replacement) {
+      showMessage(
+        basketResult,
+        `Alimento excluído. Novo alimento sugerido para ${removedItem.categoryLabel}: ${replacement.foodName} (${replacement.foodId}).`,
+        false,
+        true
+      );
+    } else {
+      showMessage(
+        basketResult,
+        `Alimento excluído. Não há outro alimento disponível para ${removedItem.categoryLabel || "esta categoria"}.`,
+        false,
+        true
+      );
+    }
+  } catch (error) {
+    lastBasketPlan = null;
+    basketTableWrap.classList.add("hidden");
+    basketCheckoutBtn.disabled = true;
+    showMessage(
+      basketResult,
+      `Alimento excluído, mas não foi possível recalcular a sugestão: ${error.message}`,
+      true
+    );
+  }
+}
+
+async function exportFoodsPdf() {
   if (!allFoods.length) {
     showMessage(outputResult, "Nao ha itens no estoque para exportar.", true);
     return;
@@ -655,28 +1148,41 @@ function exportFoodsPdf() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const generatedAt = new Date();
+  const watermarkImage = await loadPdfWatermarkImage();
 
-  doc.setFontSize(14);
-  doc.text("Base Hope - Estoque completo", 40, 38);
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${formatDateTimePtBr(generatedAt)}`, 40, 56);
+  drawPdfWatermark(doc, watermarkImage);
+  doc.setFillColor(25, 43, 112);
+  doc.roundedRect(30, 18, 782, 42, 7, 7, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(sanitizePdfText("Base Hope - Estoque completo"), 44, 42);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Gerado em: ${sanitizePdfText(formatDateTimePtBr(generatedAt))}`, 44, 54);
 
   const tableRows = allFoods.map((food) => [
-    food.id,
-    food.name,
-    String(food.quantity),
+    sanitizePdfText(food.id, "—"),
+    sanitizePdfText(food.name, "Alimento sem nome"),
+    String(food.quantity ?? 0),
     food.weight != null && food.weight !== "" ? String(food.weight) : "-",
-    formatDatePtBr(food.validityDate),
-    statusLabel(food.status)
+    sanitizePdfText(formatDatePtBr(food.validityDate), "—"),
+    sanitizePdfText(statusLabel(food.status), "Normal")
   ]);
 
-  doc.autoTable({
-    startY: 72,
+  stylePdfTable(doc, {
+    startY: 76,
     head: [["ID", "Nome", "Quantidade", "Peso (kg)", "Validade", "Status"]],
     body: tableRows,
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [99, 52, 218] }
-  });
+    columnStyles: {
+      0: { cellWidth: 70, fontStyle: "bold", textColor: [38, 67, 177] },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 85, halign: "center" },
+      3: { cellWidth: 85, halign: "center" },
+      4: { cellWidth: 115, halign: "center" },
+      5: { cellWidth: 135 }
+    }
+  }, watermarkImage);
 
   const stamp = generatedAt.toISOString().slice(0, 10);
   doc.save(`estoque-completo-${stamp}.pdf`);
@@ -738,14 +1244,14 @@ foodForm.addEventListener("submit", async (event) => {
     }
 
     const confirmed = await requestConfirmation({
-      title: "Confirmar cadastro de alimento",
-      message: "Revise os dados antes de salvar no estoque.",
+      title: "Confirmar registro",
+      message: "Você confirma o registro deste alimento?",
       details: [
         ["Alimento", body.name],
         ["Peso", body.weight != null ? `${body.weight} kg` : "Não informado"],
         ["Validade", formatDatePtBr(body.validityDate)]
       ],
-      confirmLabel: "Confirmar cadastro"
+      confirmLabel: "Sim"
     });
     if (!confirmed) {
       return;
@@ -772,13 +1278,13 @@ outputForm.addEventListener("submit", async (event) => {
   try {
     const foodId = String(formData.get("id")).toUpperCase().trim();
     const confirmed = await requestConfirmation({
-      title: "Confirmar baixa de alimento",
-      message: "Esta operação reduzirá uma unidade do estoque.",
+      title: "Confirmar saída",
+      message: "Deseja realmente registrar a saída deste alimento?",
       details: [
         ["ID da etiqueta", foodId],
         ["Quantidade de saída", "1 unidade"]
       ],
-      confirmLabel: "Confirmar baixa"
+      confirmLabel: "Sim"
     });
     if (!confirmed) {
       return;
@@ -822,7 +1328,25 @@ dashboardMonthSelect.addEventListener("change", async () => {
 });
 
 if (exportPdfBtn) {
-  exportPdfBtn.addEventListener("click", exportFoodsPdf);
+  exportPdfBtn.addEventListener("click", openReportExportDialog);
+}
+
+reportModeInputs.forEach((input) => {
+  input.addEventListener("change", updateReportModeFields);
+});
+
+[reportStartDate, reportEndDate, reportStartMonth, reportEndMonth].forEach((el) => {
+  if (el) {
+    el.addEventListener("change", renderReportPreview);
+  }
+});
+
+if (reportGenerateBtn) {
+  reportGenerateBtn.addEventListener("click", generateReportPdfFromSelection);
+}
+
+if (reportCancelBtn) {
+  reportCancelBtn.addEventListener("click", closeReportExportDialog);
 }
 
 foodsPrevBtn.addEventListener("click", () => {
@@ -887,7 +1411,10 @@ basketCheckoutBtn.addEventListener("click", async () => {
 
     const output = await api("/api/baskets/basic/checkout", {
       method: "POST",
-      body: { notes: basketNotes.value }
+      body: {
+        notes: basketNotes.value,
+        excludedFoodIds: lastBasketPlan.excludedFoodIds || []
+      }
     });
     basketNotes.value = "";
     lastBasketPlan = null;
