@@ -1061,10 +1061,11 @@ async function removeBasketItem(foodId) {
   const baseItem = (lastBasketPlan.baseItems || []).find(
     (item) => String(item.foodId) === id
   );
-  const itemExists = baseItem || (lastBasketPlan.optionalIncluded || []).some(
+  const optionalItem = (lastBasketPlan.optionalIncluded || []).find(
     (item) => String(item.foodId) === id
   );
-  if (!itemExists) {
+  const removedItem = baseItem || optionalItem;
+  if (!removedItem) {
     return;
   }
 
@@ -1073,9 +1074,7 @@ async function removeBasketItem(foodId) {
     message: "Este alimento será removido definitivamente do estoque e da base de alimentos.",
     details: [
       ["ID da etiqueta", id],
-      ["Alimento", String((baseItem || (lastBasketPlan.optionalIncluded || []).find(
-        (item) => String(item.foodId) === id
-      ))?.foodName || "Alimento")]
+      ["Alimento", String(removedItem.foodName || "Alimento")]
     ],
     confirmLabel: "Excluir"
   });
@@ -1099,33 +1098,40 @@ async function removeBasketItem(foodId) {
     return;
   }
 
-  lastBasketPlan.baseItems = (lastBasketPlan.baseItems || []).filter(
-    (item) => String(item.foodId) !== id
-  );
-  lastBasketPlan.optionalIncluded = (lastBasketPlan.optionalIncluded || []).filter(
-    (item) => String(item.foodId) !== id
-  );
-  lastBasketPlan.pickList = (lastBasketPlan.pickList || []).filter(
-    (item) => String(item.foodId) !== id
-  );
-  lastBasketPlan.excludedFoodIds = [
-    ...(lastBasketPlan.excludedFoodIds || []),
-    id
-  ];
-  if (baseItem && !(lastBasketPlan.missingBase || []).some((item) => item.key === baseItem.categoryKey)) {
-    lastBasketPlan.missingBase = [
-      ...(lastBasketPlan.missingBase || []),
-      { key: baseItem.categoryKey, label: baseItem.categoryLabel }
-    ];
+  try {
+    const replacementPlan = await api("/api/baskets/basic/plan");
+    lastBasketPlan = replacementPlan;
+    renderBasketPlan(lastBasketPlan);
+
+    const replacement = [
+      ...(replacementPlan.baseItems || []),
+      ...(replacementPlan.optionalIncluded || [])
+    ].find((item) => item.categoryKey === removedItem.categoryKey);
+    if (replacement) {
+      showMessage(
+        basketResult,
+        `Alimento excluído. Novo alimento sugerido para ${removedItem.categoryLabel}: ${replacement.foodName} (${replacement.foodId}).`,
+        false,
+        true
+      );
+    } else {
+      showMessage(
+        basketResult,
+        `Alimento excluído. Não há outro alimento disponível para ${removedItem.categoryLabel || "esta categoria"}.`,
+        false,
+        true
+      );
+    }
+  } catch (error) {
+    lastBasketPlan = null;
+    basketTableWrap.classList.add("hidden");
+    basketCheckoutBtn.disabled = true;
+    showMessage(
+      basketResult,
+      `Alimento excluído, mas não foi possível recalcular a sugestão: ${error.message}`,
+      true
+    );
   }
-  lastBasketPlan.summary = {
-    ...(lastBasketPlan.summary || {}),
-    baseCount: lastBasketPlan.baseItems.length,
-    optionalCount: lastBasketPlan.optionalIncluded.length,
-    totalLines: lastBasketPlan.baseItems.length + lastBasketPlan.optionalIncluded.length
-  };
-  lastBasketPlan.canAssemble = lastBasketPlan.summary.totalLines > 0;
-  renderBasketPlan(lastBasketPlan);
 }
 
 async function exportFoodsPdf() {
