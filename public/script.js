@@ -3,7 +3,10 @@ const appSection = document.getElementById("app-section");
 const basketPanel = document.getElementById("basket-panel");
 const volunteerPanel = document.getElementById("volunteer-panel");
 const adminPanel = document.getElementById("admin-panel");
-const welcomeText = document.getElementById("welcome-text");
+const userAvatar = document.getElementById("user-avatar");
+const userName = document.getElementById("user-name");
+const userRole = document.getElementById("user-role");
+const heroSubtitle = document.getElementById("hero-subtitle");
 
 const basketPlanBtn = document.getElementById("basket-plan-btn");
 const basketCheckoutBtn = document.getElementById("basket-checkout-btn");
@@ -13,13 +16,17 @@ const basketHint = document.getElementById("basket-hint");
 const basketTableWrap = document.getElementById("basket-table-wrap");
 const basketPlanTbody = document.getElementById("basket-plan-tbody");
 const basketSkippedList = document.getElementById("basket-skipped-list");
+const basketExcludedList = document.getElementById("basket-excluded-list");
 
 let currentUser = null;
 let lastBasketPlan = null;
+let basketExcludedIds = [];
 
 const loginForm = document.getElementById("login-form");
 const foodForm = document.getElementById("food-form");
 const outputForm = document.getElementById("output-form");
+const foodSubmitBtn = foodForm.querySelector('button[type="submit"]');
+const outputSubmitBtn = outputForm.querySelector('button[type="submit"]');
 const logoutBtn = document.getElementById("logout-btn");
 const refreshAdminBtn = document.getElementById("refresh-admin-btn");
 const exportPdfBtn = document.getElementById("export-pdf-btn");
@@ -27,7 +34,7 @@ const exportPdfBtn = document.getElementById("export-pdf-btn");
 const foodResult = document.getElementById("food-result");
 const outputResult = document.getElementById("output-result");
 const foodsTbody = document.getElementById("foods-tbody");
-const alertsList = document.getElementById("alerts-list");
+const alertsTbody = document.getElementById("alerts-tbody");
 const loginResult = document.getElementById("login-result");
 const foodsPagination = document.getElementById("foods-pagination");
 const foodsPrevBtn = document.getElementById("foods-prev-btn");
@@ -60,14 +67,32 @@ const confirmationTitle = document.getElementById("confirmation-title");
 const confirmationMessage = document.getElementById("confirmation-message");
 const confirmationDetails = document.getElementById("confirmation-details");
 const confirmationConfirmBtn = document.getElementById("confirmation-confirm-btn");
+const volunteerAlertsCard = document.getElementById("volunteer-alerts-card");
+const volunteerAlertsTbody = document.getElementById("volunteer-alerts-tbody");
+const volunteerAlertsRefreshBtn = document.getElementById("volunteer-alerts-refresh-btn");
+const volunteerAlertsPagination = document.getElementById("volunteer-alerts-pagination");
+const volunteerAlertsPrevBtn = document.getElementById("volunteer-alerts-prev-btn");
+const volunteerAlertsNextBtn = document.getElementById("volunteer-alerts-next-btn");
+const volunteerAlertsPageInfo = document.getElementById("volunteer-alerts-page-info");
 
 const FOODS_PAGE_SIZE = 10;
 const ALERTS_PAGE_SIZE = 8;
 const CATEGORY_CHART_COLORS = ["#1a37e6", "#20a36a", "#e59b1f", "#8c4fe8", "#df5a7c", "#1987bb"];
 let foodsPage = 1;
-let alertsPage = 1;
 let allFoods = [];
-let allAlerts = [];
+const URGENT_EXPIRY_DAYS = 7;
+const ROLE_LABELS = {
+  admin: "Administrador",
+  volunteer: "Voluntário"
+};
+const ROLE_SUBTITLES = {
+  admin: "Acompanhe o estoque, os vencimentos e as movimentações do mês.",
+  volunteer: "Cadastre entradas, registre saídas e monte as cestas básicas."
+};
+const SUPPORT_WHATSAPP_NUMBER = (
+  document.querySelector('meta[name="hope-support-whatsapp"]')?.getAttribute("content") || ""
+).replace(/\D/g, "");
+const helpWhatsappLink = document.getElementById("help-whatsapp");
 let confirmationResolver = null;
 let selectedDashboardMonth = "";
 
@@ -161,6 +186,39 @@ function showMessage(container, text, isError = false, isWarning = false) {
   container.textContent = text;
 }
 
+const LOADING_TIMER_DELAY_MS = 2000;
+
+async function withButtonLoading(button, loadingLabel, task) {
+  const originalHtml = button.innerHTML;
+  const originalMinWidth = button.style.minWidth;
+  const startedAt = Date.now();
+
+  button.style.minWidth = `${button.offsetWidth}px`;
+  button.disabled = true;
+  button.classList.add("is-loading");
+  button.setAttribute("aria-busy", "true");
+
+  const render = () => {
+    const elapsedMs = Date.now() - startedAt;
+    const timer =
+      elapsedMs >= LOADING_TIMER_DELAY_MS ? ` (${Math.floor(elapsedMs / 1000)}s)` : "";
+    button.innerHTML = `<span class="button-spinner" aria-hidden="true"></span>${loadingLabel}${timer}`;
+  };
+  render();
+  const intervalId = setInterval(render, 1000);
+
+  try {
+    return await task();
+  } finally {
+    clearInterval(intervalId);
+    button.innerHTML = originalHtml;
+    button.style.minWidth = originalMinWidth;
+    button.classList.remove("is-loading");
+    button.removeAttribute("aria-busy");
+    button.disabled = false;
+  }
+}
+
 function requestConfirmation({ title, message, details, confirmLabel }) {
   if (confirmationDialog.open) {
     return Promise.resolve(false);
@@ -199,13 +257,27 @@ confirmationDialog.addEventListener("click", (event) => {
   }
 });
 
+function updateHelpLink() {
+  const canShow = Boolean(currentUser && SUPPORT_WHATSAPP_NUMBER);
+  helpWhatsappLink.classList.toggle("hidden", !canShow);
+  if (!canShow) {
+    return;
+  }
+  const roleLabel = ROLE_LABELS[currentUser.role] || currentUser.role;
+  const message = `Olá! Preciso de ajuda com o sistema Hope Alimentos. Usuário: ${currentUser.username} (${roleLabel}).`;
+  helpWhatsappLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
 function showApp(user) {
   currentUser = user;
   document.body.classList.remove("auth-mode");
   loginSection.classList.add("hidden");
   appSection.classList.remove("hidden");
-  const roleLabel = user.role === "admin" ? "Administrador" : "Voluntário";
-  welcomeText.textContent = `Usuário: ${user.username} | Perfil: ${roleLabel}`;
+  userAvatar.textContent = String(user.username || "?").charAt(0).toUpperCase();
+  userName.textContent = user.username;
+  updateHelpLink();
+  userRole.textContent = ROLE_LABELS[user.role] || user.role;
+  heroSubtitle.textContent = ROLE_SUBTITLES[user.role] || "";
 
   const showBasket = user.role === "volunteer" || user.role === "admin";
   basketPanel.classList.toggle("hidden", !showBasket);
@@ -213,10 +285,12 @@ function showApp(user) {
   const canManageFoods = user.role === "volunteer" || user.role === "admin";
   volunteerPanel.classList.toggle("hidden", !canManageFoods);
   adminPanel.classList.toggle("hidden", user.role !== "admin");
+  volunteerAlertsCard.classList.toggle("hidden", user.role !== "volunteer");
 }
 
 function showLogin() {
   currentUser = null;
+  updateHelpLink();
   lastBasketPlan = null;
   document.body.classList.add("auth-mode");
   appSection.classList.add("hidden");
@@ -230,9 +304,13 @@ function showLogin() {
   basketTableWrap.classList.add("hidden");
   basketSkippedList.classList.add("hidden");
   basketSkippedList.innerHTML = "";
+  basketExcludedIds = [];
+  basketExcludedList.classList.add("hidden");
+  basketExcludedList.innerHTML = "";
   basketPlanTbody.innerHTML = "";
   basketHint.classList.add("hidden");
   basketResult.classList.add("hidden");
+  volunteerAlertsTable.setItems([]);
 }
 
 function statusLabel(status) {
@@ -299,7 +377,7 @@ function renderFoods(foods) {
   updateExportButtonState();
 
   if (!foods.length) {
-    foodsTbody.innerHTML = `<tr><td colspan="6">Nenhum alimento com estoque no momento.</td></tr>`;
+    foodsTbody.innerHTML = `<tr><td colspan="6" class="table-empty">Nenhum alimento com estoque no momento.</td></tr>`;
     foodsPagination.classList.add("hidden");
     return;
   }
@@ -310,7 +388,7 @@ function renderFoods(foods) {
   pageFoods.forEach((food) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${food.id}</td>
+      <td><span class="food-id">${food.id}</span></td>
       <td>${food.name}</td>
       <td>${food.quantity}</td>
       <td>${food.weight != null && food.weight !== "" ? food.weight : "—"}</td>
@@ -331,34 +409,113 @@ function renderFoods(foods) {
   });
 }
 
-function renderAlerts(alerts) {
-  alertsList.innerHTML = "";
-  alertsPage = clampPage(alertsPage, alerts.length, ALERTS_PAGE_SIZE);
+function expiryLabel(days) {
+  if (days === 0) return "Hoje";
+  if (days === 1) return "1 dia";
+  return `${days} dias`;
+}
 
-  if (!alerts.length) {
-    alertsList.innerHTML = "<li>Nenhum alerta de vencimento.</li>";
-    alertsPagination.classList.add("hidden");
-    return;
+function createExpiryTable({ tbody, pagination, prevBtn, nextBtn, infoEl }) {
+  let items = [];
+  let page = 1;
+
+  function showMessageRow(text) {
+    tbody.innerHTML = "";
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.className = "table-empty";
+    cell.textContent = text;
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    pagination.classList.add("hidden");
   }
 
-  const start = (alertsPage - 1) * ALERTS_PAGE_SIZE;
-  const pageAlerts = alerts.slice(start, start + ALERTS_PAGE_SIZE);
+  function render() {
+    page = clampPage(page, items.length, ALERTS_PAGE_SIZE);
+    if (!items.length) {
+      showMessageRow("Nenhum alimento vence nos próximos 30 dias.");
+      return;
+    }
 
-  pageAlerts.forEach((food) => {
-    const item = document.createElement("li");
-    item.textContent = `${food.id} - ${food.name} vence em ${food.daysToExpire} dia(s)`;
-    alertsList.appendChild(item);
+    tbody.innerHTML = "";
+    const start = (page - 1) * ALERTS_PAGE_SIZE;
+    items.slice(start, start + ALERTS_PAGE_SIZE).forEach((food) => {
+      const urgency = food.daysToExpire <= URGENT_EXPIRY_DAYS ? "vencido" : "proximo";
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td><span class="food-id">${food.id}</span></td>
+        <td>${food.name}</td>
+        <td>${formatDatePtBr(food.validityDate)}</td>
+        <td><span class="status ${urgency}">${expiryLabel(food.daysToExpire)}</span></td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    updatePaginationControls({
+      totalItems: items.length,
+      page,
+      pageSize: ALERTS_PAGE_SIZE,
+      container: pagination,
+      prevBtn,
+      nextBtn,
+      infoEl
+    });
+  }
+
+  prevBtn.addEventListener("click", () => {
+    page -= 1;
+    render();
+  });
+  nextBtn.addEventListener("click", () => {
+    page += 1;
+    render();
   });
 
-  updatePaginationControls({
-    totalItems: alerts.length,
-    page: alertsPage,
-    pageSize: ALERTS_PAGE_SIZE,
-    container: alertsPagination,
-    prevBtn: alertsPrevBtn,
-    nextBtn: alertsNextBtn,
-    infoEl: alertsPageInfo
-  });
+  return {
+    setItems(list) {
+      items = list || [];
+      page = 1;
+      render();
+    },
+    showError(message) {
+      items = [];
+      showMessageRow(message);
+    }
+  };
+}
+
+const adminAlertsTable = createExpiryTable({
+  tbody: alertsTbody,
+  pagination: alertsPagination,
+  prevBtn: alertsPrevBtn,
+  nextBtn: alertsNextBtn,
+  infoEl: alertsPageInfo
+});
+
+const volunteerAlertsTable = createExpiryTable({
+  tbody: volunteerAlertsTbody,
+  pagination: volunteerAlertsPagination,
+  prevBtn: volunteerAlertsPrevBtn,
+  nextBtn: volunteerAlertsNextBtn,
+  infoEl: volunteerAlertsPageInfo
+});
+
+async function loadVolunteerAlerts() {
+  try {
+    const data = await api("/api/alerts");
+    volunteerAlertsTable.setItems(data.alerts);
+  } catch (error) {
+    volunteerAlertsTable.showError(error.message);
+  }
+}
+
+async function refreshRoleData() {
+  if (currentUser?.role === "admin") {
+    await loadAdminData();
+  } else if (currentUser?.role === "volunteer") {
+    await loadVolunteerAlerts();
+  }
 }
 
 function renderDashboardMonthSelect(months, selectedMonth) {
@@ -558,16 +715,42 @@ function renderBasketPlan(plan) {
             (b) => b.foodId === item.foodId && b.categoryKey === item.categoryKey
           ));
       const orderCell = item.order != null ? item.order : "—";
+      const replacesNote = item.replacesIds?.length
+        ? `<span class="basket-replaces-note">no lugar de ${item.replacesIds.join(", ")}</span>`
+        : "";
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${orderCell}</td>
         <td><span class="basket-pill ${isBase ? "base" : "extra"}">${isBase ? "Base" : "Adicional"}</span></td>
-        <td><span class="basket-food-id">${item.foodId}</span></td>
+        <td><span class="food-id">${item.foodId}</span>${replacesNote}</td>
         <td>${item.foodName}</td>
         <td>${formatDatePtBr(item.validityDate)}</td>
+        <td>
+          <button type="button" class="secondary basket-row-action" data-exclude-id="${item.foodId}">
+            Não encontrei
+          </button>
+        </td>
       `;
       basketPlanTbody.appendChild(row);
     });
+  }
+
+  basketExcludedList.innerHTML = "";
+  const excluded = plan.excludedItems || [];
+  if (excluded.length) {
+    basketExcludedList.classList.remove("hidden");
+    excluded.forEach((item) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span>Retirado desta cesta: <strong>${item.foodId}</strong> · ${item.foodName}</span>
+        <button type="button" class="secondary basket-row-action" data-restore-id="${item.foodId}">
+          Desfazer
+        </button>
+      `;
+      basketExcludedList.appendChild(li);
+    });
+  } else {
+    basketExcludedList.classList.add("hidden");
   }
 
   basketSkippedList.innerHTML = "";
@@ -628,14 +811,12 @@ async function loadAdminData() {
       api(`/api/admin/dashboard${dashboardQuery}`)
     ]);
     allFoods = foodsData.foods || [];
-    allAlerts = alertsData.alerts || [];
     foodsPage = 1;
-    alertsPage = 1;
     renderFoods(allFoods);
-    renderAlerts(allAlerts);
+    adminAlertsTable.setItems(alertsData.alerts);
     renderDashboard(dashboardData);
   } catch (error) {
-    alertsList.innerHTML = `<li>${error.message}</li>`;
+    adminAlertsTable.showError(error.message);
     allFoods = [];
     updateExportButtonState();
   }
@@ -710,9 +891,7 @@ loginForm.addEventListener("submit", async (event) => {
     loginForm.reset();
     loginResult.classList.add("hidden");
     showApp(data.user);
-    if (data.user.role === "admin") {
-      await loadAdminData();
-    }
+    await refreshRoleData();
   } catch (error) {
     showMessage(loginResult, error.message, true);
   }
@@ -751,15 +930,15 @@ foodForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    const created = await api("/api/foods", {
-      method: "POST",
-      body
-    });
+    const created = await withButtonLoading(foodSubmitBtn, "Salvando…", () =>
+      api("/api/foods", {
+        method: "POST",
+        body
+      })
+    );
     foodForm.reset();
     showMessage(foodResult, `Alimento salvo. ID para etiqueta: ${created.id}`);
-    if (currentUser?.role === "admin") {
-      await loadAdminData();
-    }
+    await refreshRoleData();
   } catch (error) {
     showMessage(foodResult, error.message, true);
   }
@@ -784,21 +963,21 @@ outputForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    const output = await api("/api/foods/output", {
-      method: "POST",
-      body: {
-        id: foodId,
-        quantityOut: 1
-      }
-    });
+    const output = await withButtonLoading(outputSubmitBtn, "Registrando…", () =>
+      api("/api/foods/output", {
+        method: "POST",
+        body: {
+          id: foodId,
+          quantityOut: 1
+        }
+      })
+    );
     outputForm.reset();
     showMessage(
       outputResult,
       `Saída registrada. ID: ${output.foodId} | Estoque restante: ${output.quantityRemaining}`
     );
-    if (currentUser?.role === "admin") {
-      await loadAdminData();
-    }
+    await refreshRoleData();
   } catch (error) {
     showMessage(outputResult, error.message, true);
   }
@@ -835,29 +1014,47 @@ foodsNextBtn.addEventListener("click", () => {
   renderFoods(allFoods);
 });
 
-alertsPrevBtn.addEventListener("click", () => {
-  alertsPage -= 1;
-  renderAlerts(allAlerts);
-});
+volunteerAlertsRefreshBtn.addEventListener("click", () => loadVolunteerAlerts());
 
-alertsNextBtn.addEventListener("click", () => {
-  alertsPage += 1;
-  renderAlerts(allAlerts);
-});
-
-basketPlanBtn.addEventListener("click", async () => {
+async function loadBasketPlan() {
   basketCheckoutBtn.disabled = true;
   lastBasketPlan = null;
   try {
-    const plan = await api("/api/baskets/basic/plan");
+    const query = basketExcludedIds.length
+      ? `?exclude=${encodeURIComponent(basketExcludedIds.join(","))}`
+      : "";
+    const plan = await api(`/api/baskets/basic/plan${query}`);
     lastBasketPlan = plan;
     renderBasketPlan(plan);
   } catch (error) {
     basketTableWrap.classList.add("hidden");
     basketSkippedList.classList.add("hidden");
+    basketExcludedList.classList.add("hidden");
     basketHint.classList.add("hidden");
     showMessage(basketResult, error.message, true);
   }
+}
+
+basketPlanBtn.addEventListener("click", () => {
+  basketExcludedIds = [];
+  return loadBasketPlan();
+});
+
+basketPlanTbody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-exclude-id]");
+  if (!button) return;
+  const foodId = button.dataset.excludeId;
+  if (!basketExcludedIds.includes(foodId)) {
+    basketExcludedIds.push(foodId);
+  }
+  loadBasketPlan();
+});
+
+basketExcludedList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-restore-id]");
+  if (!button) return;
+  basketExcludedIds = basketExcludedIds.filter((id) => id !== button.dataset.restoreId);
+  loadBasketPlan();
 });
 
 basketCheckoutBtn.addEventListener("click", async () => {
@@ -885,17 +1082,26 @@ basketCheckoutBtn.addEventListener("click", async () => {
       return;
     }
 
-    const output = await api("/api/baskets/basic/checkout", {
-      method: "POST",
-      body: { notes: basketNotes.value }
-    });
+    const output = await withButtonLoading(basketCheckoutBtn, "Registrando saída…", () =>
+      api("/api/baskets/basic/checkout", {
+        method: "POST",
+        body: {
+          notes: basketNotes.value,
+          excludedIds: basketExcludedIds,
+          expectedIds: (lastBasketPlan.pickList || []).map((item) => item.foodId)
+        }
+      })
+    );
     basketNotes.value = "";
     lastBasketPlan = null;
+    basketExcludedIds = [];
     basketCheckoutBtn.disabled = true;
     basketTableWrap.classList.add("hidden");
     basketPlanTbody.innerHTML = "";
     basketSkippedList.classList.add("hidden");
     basketSkippedList.innerHTML = "";
+    basketExcludedList.classList.add("hidden");
+    basketExcludedList.innerHTML = "";
     const missing = (output.missingBase || []).map((item) => item.label).join(", ");
     showMessage(
       basketResult,
@@ -905,9 +1111,7 @@ basketCheckoutBtn.addEventListener("click", async () => {
       false,
       Boolean(missing)
     );
-    if (currentUser?.role === "admin") {
-      await loadAdminData();
-    }
+    await refreshRoleData();
   } catch (error) {
     showMessage(basketResult, error.message, true);
   }
@@ -921,9 +1125,7 @@ async function bootstrap() {
       return;
     }
     showApp(data.user);
-    if (data.user.role === "admin") {
-      await loadAdminData();
-    }
+    await refreshRoleData();
   } catch (_error) {
     showLogin();
   }

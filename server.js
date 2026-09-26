@@ -16,7 +16,8 @@ const {
 const {
   planBasicBasket,
   buildPickListForVolunteer,
-  getFoodCategory
+  getFoodCategory,
+  parseFoodIds
 } = require("./src/basket");
 const { summarizeEntryCategories } = require("./src/dashboard");
 
@@ -156,7 +157,6 @@ function createSessionMiddleware() {
   }
 
   if (isProduction) {
-    // eslint-disable-next-line no-console
     console.warn(
       "Sessoes em memoria nao persistem na Vercel (varias instancias). Configure FIREBASE_SERVICE_ACCOUNT_JSON no painel."
     );
@@ -225,7 +225,6 @@ app.post("/api/foods", requireRoles("volunteer", "admin"), async (req, res) => {
     }
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      // eslint-disable-next-line no-await-in-loop
       const shortId = await createUniqueFoodId(db);
       const payload = {
         id: shortId,
@@ -241,8 +240,6 @@ app.post("/api/foods", requireRoles("volunteer", "admin"), async (req, res) => {
       };
 
       try {
-        // "create" falha se o doc ja existir: evita sobrescrever em corrida simultanea.
-        // eslint-disable-next-line no-await-in-loop
         await db.collection("foods").doc(shortId).create(payload);
         return res.status(201).json(payload);
       } catch (error) {
@@ -342,25 +339,42 @@ app.get("/api/admin/foods", requireRole("admin"), async (req, res) => {
   }
 });
 
+async function listExpiringFoods() {
+  const snapshot = await db.collection("foods").get();
+  return snapshot.docs
+    .map((doc) => doc.data())
+    .filter(hasStock)
+    .map((food) => ({
+      ...food,
+      status: getFoodStatus(food.validityDate),
+      daysToExpire: getDaysToExpire(food.validityDate)
+    }))
+    .filter(
+      (food) =>
+        food.daysToExpire !== null &&
+        food.daysToExpire >= 0 &&
+        food.daysToExpire <= 30
+    )
+    .sort((a, b) => a.daysToExpire - b.daysToExpire);
+}
+
 app.get("/api/admin/alerts", requireRole("admin"), async (req, res) => {
   try {
-    const snapshot = await db.collection("foods").get();
-    const alerts = snapshot.docs
-      .map((doc) => doc.data())
-      .filter(hasStock)
-      .map((food) => ({
-        ...food,
-        status: getFoodStatus(food.validityDate),
-        daysToExpire: getDaysToExpire(food.validityDate)
-      }))
-      .filter(
-        (food) =>
-          food.daysToExpire !== null &&
-          food.daysToExpire >= 0 &&
-          food.daysToExpire <= 30
-      )
-      .sort((a, b) => a.daysToExpire - b.daysToExpire);
+    return res.json({ alerts: await listExpiringFoods() });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
 
+app.get("/api/alerts", requireRoles("volunteer", "admin"), async (req, res) => {
+  try {
+    const alerts = (await listExpiringFoods()).map((food) => ({
+      id: food.id,
+      name: food.name,
+      validityDate: food.validityDate,
+      daysToExpire: food.daysToExpire,
+      status: food.status
+    }));
     return res.json({ alerts });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -510,13 +524,15 @@ app.get(
     try {
       const snapshot = await db.collection("foods").get();
       const foods = snapshot.docs.map((doc) => doc.data());
-      const plan = planBasicBasket(foods);
+      const excludedIds = parseFoodIds(req.query.exclude);
+      const plan = planBasicBasket(foods, { excludedIds });
       const pickList = buildPickListForVolunteer(plan, getDaysToExpire);
 
       return res.json({
         canAssemble: plan.canAssemble,
         hasAllBaseItems: plan.hasAllBaseItems,
         missingBase: plan.missingBase,
+        excludedItems: plan.excludedItems,
         pickList,
         baseItems: plan.baseItems.map((item) => ({
           categoryKey: item.categoryKey,
@@ -558,15 +574,29 @@ app.post(
         ? String(req.body.notes).trim().slice(0, 500)
         : "";
 
+      const excludedIds = parseFoodIds(req.body?.excludedIds);
       const snapshot = await db.collection("foods").get();
       const foods = snapshot.docs.map((doc) => doc.data());
-      const plan = planBasicBasket(foods);
+      const plan = planBasicBasket(foods, { excludedIds });
 
       if (!plan.canAssemble) {
         return res.status(400).json({
           message: "Não há alimentos disponíveis para registrar a saída da cesta.",
           missingBase: plan.missingBase
         });
+      }
+
+      if (Array.isArray(req.body?.expectedIds)) {
+        const expected = parseFoodIds(req.body.expectedIds).sort();
+        const planned = [
+          ...new Set(plan.allocations.map((item) => String(item.foodId).trim().toUpperCase()))
+        ].sort();
+        if (expected.join(",") !== planned.join(",")) {
+          return res.status(409).json({
+            message:
+              "O estoque mudou desde o cálculo da montagem. Calcule novamente antes de registrar a saída."
+          });
+        }
       }
 
       const lines = [];
@@ -618,6 +648,7 @@ app.post(
         notes,
         lines,
         missingBase: plan.missingBase,
+        excludedItems: plan.excludedItems,
         registeredBy: req.session.user.username,
         createdAt: new Date().toISOString()
       });
@@ -647,7 +678,10 @@ function sendAppHtml(req, res) {
       proto = req.protocol || "http";
     }
     const apiOrigin = `${proto}://${host}`.replace(/\/$/, "").replace(/"/g, "");
-    const out = html.replace(/__HOPE_API_ORIGIN__/g, apiOrigin);
+    const supportWhatsapp = String(process.env.SUPPORT_WHATSAPP_NUMBER || "").replace(/\D/g, "");
+    const out = html
+      .replace(/__HOPE_API_ORIGIN__/g, apiOrigin)
+      .replace(/__HOPE_SUPPORT_WHATSAPP__/g, supportWhatsapp);
     return res.type("html").send(out);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -676,6 +710,5 @@ function spaFallback(req, res, next) {
 app.use(spaFallback);
 
 app.listen(port, () => {
-  // eslint-disable-next-line no-console
   console.log(`Hope Food Control rodando em http://localhost:${port}`);
 });

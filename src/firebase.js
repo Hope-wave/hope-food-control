@@ -101,8 +101,6 @@ function buildServiceAccount() {
       ? serviceAccountPath
       : path.join(process.cwd(), serviceAccountPath);
 
-    // Dynamic require keeps setup simple for local MVP usage.
-    // eslint-disable-next-line global-require
     return normalizeServiceAccount(require(absolutePath));
   }
 
@@ -118,13 +116,11 @@ function initFirebase() {
   try {
     serviceAccount = buildServiceAccount();
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.warn(`Falha ao inicializar Firebase: ${error.message}`);
     return { db: createInMemoryDb(), useFirestoreSessionStore: false };
   }
 
   if (!serviceAccount) {
-    // eslint-disable-next-line no-console
     console.warn(
       "Firebase nao configurado. Rodando em modo local (dados em memoria)."
     );
@@ -136,7 +132,6 @@ function initFirebase() {
     projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id
   });
 
-  // eslint-disable-next-line no-console
   console.log("Firebase conectado com sucesso ao Firestore.");
   return { db: admin.firestore(), useFirestoreSessionStore: true };
 }
