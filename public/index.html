@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="hope-api-origin" content="__HOPE_API_ORIGIN__" />
+    <meta name="hope-support-whatsapp" content="__HOPE_SUPPORT_WHATSAPP__" />
     <title>Base Hope - Controle de Alimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,8 +36,8 @@
               <div class="input-wrap">
                 <span class="input-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                   </svg>
                 </span>
                 <input
@@ -98,34 +99,126 @@
 
     <main class="container">
       <header class="hero">
-        <div class="hero-brand" aria-label="Hope Tech Igreja Onda">
-          <span class="logo-hope">hope</span>
-          <span class="logo-tech">Alimentos</span>
-          <span class="logo-church">igreja <strong>onda</strong></span>
+        <div class="hero-top">
+          <div class="hero-brand" aria-label="Hope Tech Igreja Onda">
+            <span class="logo-hope">hope</span>
+            <span class="logo-tech">Alimentos</span>
+            <span class="logo-church">igreja <strong>onda</strong></span>
+          </div>
+          <div class="user-bar">
+            <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
+            <div class="user-meta">
+              <strong id="user-name"></strong>
+              <span id="user-role" class="user-role"></span>
+            </div>
+            <button id="logout-btn" class="secondary user-logout" type="button">Sair</button>
+          </div>
         </div>
         <h1>Controle de estoque de alimentos</h1>
-        <p>Sistema para controle de estoque de alimentos do Hope</p>
+        <p id="hero-subtitle"></p>
       </header>
 
       <section id="app-section" class="hidden">
-        <div class="card top-bar">
-          <div class="top-bar-info">
+        <section id="volunteer-panel" class="hidden">
+          <div class="grid volunteer-grid">
+            <article class="card action-card action-card-entry">
+              <div class="action-card-top">
+                <span class="action-step" aria-hidden="true">1</span>
+                <div>
+                  <h3>Cadastro de Alimento</h3>
+                  <p class="section-description">
+                    Registre entradas no estoque e gere o ID de etiquetagem.
+                  </p>
+                </div>
+              </div>
+              <form id="food-form" class="action-form">
+                <label for="food-name">Nome</label>
+                <input id="food-name" name="name" type="text" required />
 
-            <p id="welcome-text"></p>
+                <label for="food-weight">Peso (kg) — opcional</label>
+                <input
+                  id="food-weight"
+                  name="weight"
+                  type="number"
+                  step="0.1"
+                  placeholder="Deixe em branco se não souber"
+                />
+
+                <label for="food-validity">Data de validade</label>
+                <input
+                  id="food-validity"
+                  name="validityDate"
+                  type="date"
+                  required
+                  aria-describedby="food-validity-note"
+                />
+                <p id="food-validity-note" class="field-note">
+                  <strong>Sem o dia na embalagem?</strong> Use o último dia do mês indicado.
+                  Ex.: validade 03/2027 → 31/03/2027.
+                </p>
+
+                <button type="submit">Salvar alimento</button>
+              </form>
+              <div id="food-result" class="result hidden"></div>
+            </article>
+
+            <article class="card action-card action-card-exit">
+              <div class="action-card-top">
+                <span class="action-step" aria-hidden="true">2</span>
+                <div>
+                  <h3>Registrar Saída</h3>
+                  <p class="section-description">
+                    Informe o ID da etiqueta para retirar 1 unidade.
+                  </p>
+                </div>
+              </div>
+              <form id="output-form" class="action-form">
+                <label for="output-id">ID do alimento</label>
+                <input
+                  id="output-id"
+                  name="id"
+                  type="text"
+                  placeholder="A1"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  spellcheck="false"
+                  required
+                  aria-describedby="output-id-note"
+                />
+                <p id="output-id-note" class="field-note">
+                  O ID fica na etiqueta colada no alimento. Pode digitar com letra maiúscula
+                  ou minúscula.
+                </p>
+
+                <button type="submit">Registrar saída</button>
+              </form>
+              <div id="output-result" class="result hidden"></div>
+            </article>
           </div>
-          <button id="logout-btn" class="secondary">Sair</button>
-        </div>
+        </section>
 
         <section id="basket-panel" class="card basket-section hidden">
           <div class="section-head">
             <span class="section-badge">Cesta básica</span>
             <h3>Montagem de Cesta Básica</h3>
             <p class="section-description">
-              Use a tabela abaixo para montar a cesta: cada linha mostra o ID da etiqueta no
-              estoque. A ordem é por validade mais próxima. Os 7 itens da base são
-              obrigatórios; adicionais entram quando houver estoque, se faltar adicional, a
-              cesta ainda pode sair.
+              Os 7 itens da base são obrigatórios; adicionais entram quando houver estoque.
+              A lista prioriza os alimentos com validade mais próxima.
             </p>
+            <ol class="basket-steps">
+              <li>
+                <span><strong>Calcular montagem</strong> para gerar a lista de etiquetas.</span>
+              </li>
+              <li>
+                <span>
+                  Separe cada item pelo <strong>ID da etiqueta</strong>. Não achou? Clique em
+                  <strong>Não encontrei</strong>.
+                </span>
+              </li>
+              <li>
+                <span><strong>Registrar saída</strong> para dar baixa no estoque.</span>
+              </li>
+            </ol>
           </div>
 
           <div class="basket-toolbar">
@@ -158,80 +251,49 @@
                   <th>ID (etiqueta)</th>
                   <th>Nome</th>
                   <th>Validade</th>
+                  <th>Ação</th>
                 </tr>
               </thead>
               <tbody id="basket-plan-tbody"></tbody>
             </table>
           </div>
+          <ul id="basket-excluded-list" class="basket-excluded hidden"></ul>
           <ul id="basket-skipped-list" class="basket-skipped hidden"></ul>
         </section>
 
-        <section id="volunteer-panel" class="hidden">
-          
-
-          <div class="grid volunteer-grid">
-            <article class="card action-card action-card-entry">
-              <div class="action-card-top">
-                <span class="action-step" aria-hidden="true">1</span>
-                <div>
-                  <h3>Cadastro de Alimento</h3>
-                  <p class="section-description">
-                    Registre entradas no estoque e gere o ID de etiquetagem.
-                  </p>
-                </div>
-              </div>
-              <form id="food-form" class="action-form">
-                <label for="food-name">Nome</label>
-                <input id="food-name" name="name" type="text" required />
-
-                <label for="food-weight">Peso (kg) — opcional</label>
-                <input
-                  id="food-weight"
-                  name="weight"
-                  type="number"
-                  step="0.1"
-                  placeholder="Deixe em branco se não souber"
-                />
-
-                <label for="food-validity">Data de validade</label>
-                <input
-                  id="food-validity"
-                  name="validityDate"
-                  type="date"
-                  required
-                />
-
-                <button type="submit">Salvar alimento</button>
-              </form>
-              <div id="food-result" class="result hidden"></div>
-            </article>
-
-            <article class="card action-card action-card-exit">
-              <div class="action-card-top">
-                <span class="action-step" aria-hidden="true">2</span>
-                <div>
-                  <h3>Registrar Saída</h3>
-                  <p class="section-description">
-                    Informe o ID da etiqueta para retirar 1 unidade.
-                  </p>
-                </div>
-              </div>
-              <form id="output-form" class="action-form">
-                <label for="output-id">ID do alimento</label>
-                <input
-                  id="output-id"
-                  name="id"
-                  type="text"
-                  placeholder="A1"
-                  required
-                />
-
-                <button type="submit">Registrar saída</button>
-              </form>
-              <div id="output-result" class="result hidden"></div>
-            </article>
+        <div id="volunteer-alerts-card" class="card volunteer-alerts-card hidden">
+          <div class="table-header">
+            <div>
+              <h3>Próximos do vencimento (até 30 dias)</h3>
+              <p class="section-description">
+                Priorize estes itens nas saídas. O mais urgente aparece primeiro.
+              </p>
+            </div>
+            <div class="table-actions">
+              <button id="volunteer-alerts-refresh-btn" class="secondary" type="button">
+                Atualizar
+              </button>
+            </div>
           </div>
-        </section>
+          <div class="table-wrapper table-compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID (etiqueta)</th>
+                  <th>Nome</th>
+                  <th>Validade</th>
+                  <th>Vence em</th>
+                </tr>
+              </thead>
+              <tbody id="volunteer-alerts-tbody"></tbody>
+            </table>
+          </div>
+          <div id="volunteer-alerts-pagination" class="pagination hidden">
+            <button id="volunteer-alerts-prev-btn" type="button" class="secondary">Anterior</button>
+            <span id="volunteer-alerts-page-info" class="pagination-info"></span>
+            <button id="volunteer-alerts-next-btn" type="button" class="secondary">Próxima</button>
+          </div>
+        </div>
 
         <section id="admin-panel" class="hidden">
           <section class="dashboard-section" aria-labelledby="dashboard-title">
@@ -360,8 +422,25 @@
           </section>
 
           <div class="card">
-            <h3>Alertas (vencimento em até 30 dias)</h3>
-            <ul id="alerts-list" class="alerts-list"></ul>
+            <div class="table-header">
+              <div>
+                <h3>Próximos do vencimento (até 30 dias)</h3>
+                <p class="section-description">O mais urgente aparece primeiro.</p>
+              </div>
+            </div>
+            <div class="table-wrapper table-compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID (etiqueta)</th>
+                    <th>Nome</th>
+                    <th>Validade</th>
+                    <th>Vence em</th>
+                  </tr>
+                </thead>
+                <tbody id="alerts-tbody"></tbody>
+              </table>
+            </div>
             <div id="alerts-pagination" class="pagination hidden">
               <button id="alerts-prev-btn" type="button" class="secondary">Anterior</button>
               <span id="alerts-page-info" class="pagination-info"></span>
@@ -418,6 +497,21 @@
         </form>
       </div>
     </dialog>
+
+    <a
+      id="help-whatsapp"
+      class="help-fab hidden"
+      href="https://wa.me/"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Precisa de ajuda? Fale com o suporte pelo WhatsApp"
+    >
+      <svg class="help-fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.3z" />
+        <path d="M9.2 8.6c.2-.5.6-.6.9-.6h.5c.2 0 .4.1.5.4l.6 1.5c.1.3 0 .5-.1.7l-.5.6c.6 1.2 1.5 2.1 2.7 2.7l.6-.5c.2-.2.5-.2.7-.1l1.5.6c.3.1.4.3.4.5v.5c0 .3-.1.7-.6.9-.7.3-1.7.4-3.2-.4a8.6 8.6 0 0 1-3.6-3.6c-.8-1.5-.7-2.5-.4-3.2z" />
+      </svg>
+      <span class="help-fab-label">Precisa de ajuda?</span>
+    </a>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>

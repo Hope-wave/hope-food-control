@@ -53,10 +53,6 @@ function generateShortId(letterCount = 1, digitCount = 1) {
   return `${letterPart}${digitPart}`;
 }
 
-/**
- * Item ainda no estoque para listagens, cestas e baixas:
- * quantidade > 0 e não marcado como indisponível (saída total / entregue).
- */
 function hasStock(food) {
   if (!food || food.available === false) {
     return false;
@@ -79,7 +75,6 @@ async function createUniqueFoodId(db) {
       }
       tried.add(candidate);
 
-      // eslint-disable-next-line no-await-in-loop
       const existing = await db.collection("foods").doc(candidate).get();
       if (!existing.exists) {
         return candidate;

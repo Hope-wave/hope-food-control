@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 
 const {
   planBasicBasket,
-  buildPickListForVolunteer
+  buildPickListForVolunteer,
+  parseFoodIds
 } = require("../src/basket");
 const { summarizeEntryCategories } = require("../src/dashboard");
 
@@ -55,6 +56,51 @@ test("permite a saída parcial quando houver alimentos disponíveis e informa os
     plan.missingBase.map((item) => item.key),
     ["feijao", "acucar", "sal", "oleo", "macarrao", "molho"]
   );
+});
+
+test("sugere outra unidade do mesmo alimento quando o voluntário retira um ID da cesta", () => {
+  const foods = [
+    food("A1", "Arroz", "2026-08-10"),
+    food("A2", "Arroz tipo 1", "2026-08-20"),
+    food("A3", "Arroz", "2026-09-01"),
+    food("F1", "Feijão", "2026-08-11")
+  ];
+
+  const first = planBasicBasket(foods);
+  assert.deepEqual(first.baseItems.map((item) => item.foodId), ["A1", "F1"]);
+  assert.deepEqual(first.excludedItems, []);
+
+  const plan = planBasicBasket(foods, { excludedIds: ["a1"] });
+  const pickList = buildPickListForVolunteer(plan, () => 10);
+  const arroz = pickList.find((item) => item.categoryKey === "arroz");
+
+  assert.equal(arroz.foodId, "A2");
+  assert.deepEqual(arroz.replacesIds, ["A1"]);
+  assert.deepEqual(pickList.find((item) => item.foodId === "F1").replacesIds, []);
+  assert.deepEqual(plan.excludedItems, [
+    { foodId: "A1", foodName: "Arroz", categoryKey: "arroz", categoryLabel: "Arroz" }
+  ]);
+  assert.equal(foods.find((item) => item.id === "A1").quantity, 1);
+
+  const next = planBasicBasket(foods, { excludedIds: ["A1", "A2"] });
+  assert.equal(next.baseItems.find((item) => item.categoryKey === "arroz").foodId, "A3");
+});
+
+test("marca o item como faltante quando não há outra unidade do mesmo alimento", () => {
+  const plan = planBasicBasket(
+    [food("A1", "Arroz", "2026-08-10"), food("F1", "Feijão", "2026-08-11")],
+    { excludedIds: ["A1"] }
+  );
+
+  assert.deepEqual(plan.allocations.map((item) => item.foodId), ["F1"]);
+  assert.ok(plan.missingBase.some((item) => item.key === "arroz"));
+  assert.deepEqual(plan.excludedItems.map((item) => item.foodId), ["A1"]);
+});
+
+test("normaliza a lista de IDs recebida da tela", () => {
+  assert.deepEqual(parseFoodIds(" a1, B2 ,,a1"), ["A1", "B2"]);
+  assert.deepEqual(parseFoodIds(["c3", "C3", ""]), ["C3"]);
+  assert.deepEqual(parseFoodIds(undefined), []);
 });
 
 test("bloqueia a saída da cesta quando não há nenhum alimento disponível", () => {

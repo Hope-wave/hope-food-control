@@ -25,7 +25,6 @@ function matchesAnyPhrase(name, phrases) {
   return phrases.some((phrase) => includesPhrase(name, phrase));
 }
 
-/** Itens obrigatórios da cesta básica (reconhecidos pelo nome cadastrado). */
 const BASE_RULES = [
   { key: "arroz", label: "Arroz", phrases: ["arroz"] },
   { key: "feijao", label: "Feijão", phrases: ["feijao", "feijão"] },
@@ -41,7 +40,6 @@ const BASE_RULES = [
   { key: "molho", label: "Molho", phrases: ["molho"] }
 ];
 
-/** Adicionais: entram se houver estoque; ausência não impede a cesta. */
 const OPTIONAL_RULES = [
   {
     key: "farinha",
@@ -147,11 +145,35 @@ function pickOneUnitFromCandidates(candidates, workingQtyById) {
   };
 }
 
-function planBasicBasket(foods) {
-  const list = foods.filter(hasStock).map((f) => ({
-    ...f,
-    quantity: Number(f.quantity)
-  }));
+function normalizeFoodId(id) {
+  return String(id ?? "").trim().toUpperCase();
+}
+
+function parseFoodIds(value) {
+  const raw = Array.isArray(value) ? value : String(value ?? "").split(",");
+  return [...new Set(raw.map(normalizeFoodId).filter(Boolean))].slice(0, 200);
+}
+
+function planBasicBasket(foods, { excludedIds = [] } = {}) {
+  const excluded = new Set(parseFoodIds(excludedIds));
+  const inStock = foods.filter(hasStock);
+  const list = inStock
+    .filter((f) => !excluded.has(normalizeFoodId(f.id)))
+    .map((f) => ({
+      ...f,
+      quantity: Number(f.quantity)
+    }));
+  const excludedItems = inStock
+    .filter((f) => excluded.has(normalizeFoodId(f.id)))
+    .map((f) => {
+      const category = getFoodCategory(f.name);
+      return {
+        foodId: f.id,
+        foodName: f.name,
+        categoryKey: category.key,
+        categoryLabel: category.label
+      };
+    });
 
   const workingQtyById = new Map(list.map((f) => [f.id, f.quantity]));
 
@@ -197,10 +219,13 @@ function planBasicBasket(foods) {
     }
   }
 
+  for (const item of [...baseAllocations, ...optionalIncluded]) {
+    item.replacesIds = excludedItems
+      .filter((e) => e.categoryKey === item.categoryKey)
+      .map((e) => e.foodId);
+  }
+
   const allocations = [...baseAllocations, ...optionalIncluded];
-  // A cesta pode sair com os itens que estiverem disponíveis. A ausência de
-  // itens-base é informativa, não bloqueia a entrega; só não há saída se não
-  // existir nenhum item para baixar.
   const canAssemble = allocations.length > 0;
   const hasAllBaseItems = missingBase.length === 0;
 
@@ -208,6 +233,7 @@ function planBasicBasket(foods) {
     canAssemble,
     hasAllBaseItems,
     missingBase,
+    excludedItems,
     baseItems: baseAllocations,
     optionalIncluded,
     optionalSkipped,
@@ -215,10 +241,6 @@ function planBasicBasket(foods) {
   };
 }
 
-/**
- * Lista única para o voluntário montar a cesta: ordem por validade (FEFO),
- * depois ID. Cada linha traz o ID da etiqueta a separar no estoque.
- */
 function buildPickListForVolunteer(plan, getDaysToExpire) {
   const merged = [...plan.baseItems, ...plan.optionalIncluded];
   merged.sort((a, b) => {
@@ -242,6 +264,7 @@ function buildPickListForVolunteer(plan, getDaysToExpire) {
       categoryLabel: item.categoryLabel,
       foodId: item.foodId,
       foodName: item.foodName,
+      replacesIds: item.replacesIds || [],
       validityDate: item.validityDate,
       quantityOut: item.quantityOut,
       daysToExpire: getDaysToExpire(item.validityDate)
@@ -253,6 +276,7 @@ module.exports = {
   BASE_RULES,
   OPTIONAL_RULES,
   getFoodCategory,
+  parseFoodIds,
   planBasicBasket,
   buildPickListForVolunteer
 };
